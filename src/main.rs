@@ -63,6 +63,14 @@ fn main() {
     );
     graph.add_edge(grove_st, exchange_pl, dist_grove_exchange);
 
+    let dist_newport_exchange = equirectangular_distance(
+        graph[newport].lat,
+        graph[newport].lon,
+        graph[exchange_pl].lat,
+        graph[exchange_pl].lon,
+    );
+    graph.add_edge(newport, exchange_pl, dist_newport_exchange);
+
     println!(
         "Edge: {} <-> {} ({:.4} miles)",
         graph[newport].name, graph[grove_st].name, dist_newport_grove
@@ -71,4 +79,19 @@ fn main() {
         "Edge: {} <-> {} ({:.4} miles)",
         graph[grove_st].name, graph[exchange_pl].name, dist_grove_exchange
     );
+    println!(
+        "Edge: {} <-> {} ({:.4} miles)",
+        graph[newport].name, graph[exchange_pl].name, dist_newport_exchange
+    );
+
+    let path_costs = dijkstra(&graph, newport, Some(exchange_pl), |edge| *edge.weight());
+
+    if let Some(&shortest_distance) = path_costs.get(&exchange_pl) {
+        println!(
+            "\nSUCCESS: Shortest path distance from {} to {} is {:.4} miles!",
+            graph[newport].name, graph[exchange_pl].name, shortest_distance
+        );
+    } else {
+        println!("\nERROR: No path found between those stations.");
+    };
 }

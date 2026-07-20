@@ -38,9 +38,17 @@ graph LR
 Here is the step-by-step implementation plan for **NightOwl**:
 
 ### Stage 1: The Static Walking Skeleton ($G_{\text{static}}$)
-- [ ] Set up baseline Rust workspace and graph primitives
-- [ ] Formulate basic routing structures for a static walking graph
-- [ ] Run baseline Dijkstra pathfinding test cases
+- [x] Set up baseline Rust workspace and graph primitives
+- [x] Formulate basic routing structures for a static walking graph
+- [x] Run baseline Dijkstra pathfinding test cases
+```
+Edge: Newport PATH <-> Grove St PATH (0.6711 miles)
+Edge: Grove St PATH <-> Exchange Place PATH (0.5788 miles)
+Edge: Newport PATH <-> Exchange Place PATH (0.7366 miles)
+
+SUCCESS: Shortest path distance from Newport PATH to Exchange Place PATH is 0
+.7366 miles!
+```
 
 ### Stage 2: The Schedule Compiler (Static GTFS)
 - [ ] Parse routes, calendar dates, and travel schedules from GTFS zip feeds
