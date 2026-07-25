@@ -48,6 +48,12 @@ Edge: Newport PATH <-> Exchange Place PATH (0.7366 miles)
 
 SUCCESS: Shortest path distance from Newport PATH to Exchange Place PATH is 0
 .7366 miles!
+
+--- Testing Edge Weight At Specific Departure Times ---
+Arriving at 8:00 AM (480 mins): 1.53 minutes total cost
+Arriving at 8:10 AM (490 mins): 21.53 minutes total cost
+Arriving at 9:00 AM (540 mins): inf minutes total cost
+-------------------------------------------------------
 ```
 
 ### Stage 2: The Schedule Compiler (Static GTFS)
