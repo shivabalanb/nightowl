@@ -60,6 +60,22 @@ Arriving at 9:00 AM (540 mins): inf minutes total cost
 - [ ] Parse routes, calendar dates, and travel schedules from GTFS zip feeds
 - [ ] Compile schedules into time-expanded coordinate graph nodes
 - [ ] Handle transit transfers and walking buffers between hubs
+```
+loaded 64 stations!
+
+station: 14th Street (26722) at (40.7373, -73.9968)
+station: 23rd Street (26723) at (40.7429, -73.9928)
+station: 33rd Street (26724) at (40.7491, -73.9883)
+station: 9th Street (26725) at (40.7342, -73.9991)
+station: Christopher Street (26726) at (40.7330, -74.0071)
+station: Exchange Place (26727) at (40.7168, -74.0324)
+station: Grove Street (26728) at (40.7197, -74.0425)
+station: Harrison (26729) at (40.7394, -74.1559)
+station: Hoboken (26730) at (40.7359, -74.0292)
+station: Journal Square (26731) at (40.7330, -74.0629)
+
+loaded 153927 scheduled stop_times!
+```
 
 ### Stage 3: The Live Stream (GBFS & Live PATH API Ingestion)
 - [ ] Pull real-time train coordinates and CitiBike dock statuses (GBFS)
