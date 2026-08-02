@@ -63,7 +63,6 @@ Arriving at 9:00 AM (540 mins): inf minutes total cost
 ```
 **LOAD TRANSIT STOPS**
 
-loaded 64 stops!
 stop: 14th Street (26722) at (40.7373, -73.9968)
 stop: 23rd Street (26723) at (40.7429, -73.9928)
 stop: 33rd Street (26724) at (40.7491, -73.9883)
@@ -74,36 +73,38 @@ stop: Grove Street (26728) at (40.7197, -74.0425)
 stop: Harrison (26729) at (40.7394, -74.1559)
 stop: Hoboken (26730) at (40.7359, -74.0292)
 stop: Journal Square (26731) at (40.7330, -74.0629)
+stop: Newport (26732) at (40.7270, -74.0338)
+stop: Newark (26733) at (40.7345, -74.1637)
+stop: World Trade Center (26734) at (40.7127, -74.0119)
 
-**LOAD TRANSIT STOP TIMES**
+**BUILD GRAPH**
 
-loaded 153927 scheduled stop_times!
+Built graph with 13 origin stops!
 
-GROUP STOP TIMES BY TRIP
+**FIND ROUTE**
 
-Grouped into 22369 unique trips!
+Finding best route from Newport (26732) to 23rd Street (26723) departing at 10:15 EST...
 
-Trip ID: t_6004257_b_none_tn_9
-  Stop 1 -> Stop Newark, departure_time Ok(795)
-  Stop 2 -> Stop Harrison, departure_time Ok(797)
-  Stop 3 -> Stop Journal Square, departure_time Ok(808)
-  Stop 4 -> Stop Grove Street, departure_time Ok(812)
-  Stop 5 -> Stop Exchange Place, departure_time Ok(815)
-  Stop 6 -> Stop World Trade Center, departure_time Ok(820)
-
-**EXTRACT TRANSIT SEGMENTS**
-
-Extracted 131558 total transit segments!
-
-Sample connection: Stop Newark -> Stop Harrison (Trip: t_6004257_b_none_tn_9,
- Departs: 795m, Duration: 2m)
-
-**BUILD TRANSIT GRAPH**
-
-Built TransitGraph with 25 origin stops!
-
-Station: World Trade Center (781763) has 1 outgoing connections:
-  -> Connection to Exchange Place (781731) with 743 scheduled departures
+============================================================
+  ROUTE: Newport (26732) ➔ 23rd Street (26723)
+  Total Duration: 13 minutes
+============================================================
+Leg 1: [Trip ID: t_6003182_b_none_tn_5]
+   Get On:  Newport                        @ 10:15 EST
+   Get Off: Christopher Street             @ 10:23 EST
+------------------------------------------------------------
+Leg 2: [Trip ID: t_3632379_b_none_tn_3]
+   Get On:  Christopher Street             @ 10:23 EST
+   Get Off: 9th Street                     @ 10:25 EST
+------------------------------------------------------------
+Leg 3: [Trip ID: t_5965024_b_none_tn_2]
+   Get On:  9th Street                     @ 10:25 EST
+   Get Off: 14th Street                    @ 10:27 EST
+------------------------------------------------------------
+Leg 4: [Trip ID: t_5965024_b_none_tn_2]
+   Get On:  14th Street                    @ 10:27 EST
+   Get Off: 23rd Street                    @ 10:28 EST
+============================================================
 ```
 
 ### Stage 3: The Live Stream (GBFS & Live PATH API Ingestion)

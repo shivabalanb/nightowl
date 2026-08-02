@@ -1,90 +1,57 @@
 use std::error::Error;
 
 use nightowl::{
+    graph::TransitGraph,
     ingestor::{
-        extract_transit_segments, group_stop_times_by_trip, load_transit_stop_times,
-        load_transit_stops, parse_time,
+        StopDirectory, extract_transit_segments, group_stop_times_by_trip, load_transit_stop_times,
+        load_transit_stops,
     },
-    model::{StopDirectory, TransitGraph},
+    router::find_route,
+    util::Time,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("\n**LOAD TRANSIT STOPS**\n");
     let stops = load_transit_stops("data/path/stops.txt")?;
-
-    println!("loaded {} stops!", stops.len());
-
-    for stop in stops.iter().take(10) {
-        println!(
-            "stop: {} ({}) at ({:.4}, {:.4})",
-            stop.stop_name, stop.stop_id, stop.stop_lat, stop.stop_lon
-        );
-    }
-
     let stop_dir = StopDirectory::new(stops);
 
-    println!("\n**LOAD TRANSIT STOP TIMES**\n");
-    let stop_times = load_transit_stop_times("data/path/stop_times.txt")?;
+    print!("{}", stop_dir);
 
-    println!("loaded {} scheduled stop_times!", stop_times.len());
+    let stop_times = load_transit_stop_times("data/path/stop_times.txt", stop_dir.parent_map())?;
 
-    println!("\nGROUP STOP TIMES BY TRIP\n");
     let grouped_trips = group_stop_times_by_trip(stop_times);
-    println!("Grouped into {} unique trips!", grouped_trips.len());
 
-    if let Some((trip_id, stops)) = grouped_trips.iter().next() {
-        println!("\nTrip ID: {}", trip_id);
-        for stop in stops {
-            println!(
-                "  Stop {} -> Stop {}, departure_time {:?}",
-                stop.stop_sequence,
-                stop_dir.get_name(&stop.stop_id),
-                parse_time(&stop.departure_time)
-            );
-        }
-    }
-
-    println!("\n**EXTRACT TRANSIT SEGMENTS**\n");
     let segments = extract_transit_segments(&grouped_trips);
-    println!("Extracted {} total transit segments!", segments.len());
 
-    if let Some(first_segment) = segments.first() {
-        println!(
-            "\nSample connection: Stop {} -> Stop {} (Trip: {}, Departs: {}m, Duration: {}m)",
-            stop_dir.get_name(&first_segment.from_stop_id),
-            stop_dir.get_name(&first_segment.to_stop_id),
-            first_segment.transit_segment_detail.trip_id,
-            first_segment.transit_segment_detail.departure_time,
-            first_segment.transit_segment_detail.travel_time,
-        );
-    }
-
-    println!("\n**BUILD TRANSIT GRAPH**\n");
+    println!("\n**BUILD GRAPH**\n");
     let transit_graph = TransitGraph::from_segments(segments);
 
     println!(
-        "Built TransitGraph with {} origin stops!",
+        "Built graph with {} origin stops!",
         transit_graph.adjacency_list.len()
     );
 
-    if let Some((from_id, edges)) = transit_graph.adjacency_list.iter().next() {
-        let origin_name = stop_dir.get_name(from_id);
-        println!(
-            "\nStation: {} ({}) has {} outgoing connections:",
-            origin_name,
-            from_id,
-            edges.len()
-        );
+    println!("\n**FIND ROUTE**\n");
 
-        for edge in edges {
-            let dest_name = stop_dir.get_name(&edge.to_stop_id);
-            println!(
-                "  -> Connection to {} ({}) with {} scheduled departures",
-                dest_name,
-                edge.to_stop_id,
-                edge.departures.len()
-            );
+    let origin_id = "26732"; // Newport (26732) Hoboken (26730) Exchange Place (26727) 
+    let destination_id = "26723"; // 23rd Street (26723)
+    let departure_time: Time = "10:15".parse()?;
+
+    let origin_name = stop_dir.get_name(origin_id);
+    let dest_name = stop_dir.get_name(destination_id);
+
+    println!(
+        "Finding best route from {} ({}) to {} ({}) departing at {}...",
+        origin_name, origin_id, dest_name, destination_id, departure_time
+    );
+
+    match find_route(&transit_graph, origin_id, destination_id, departure_time) {
+        Some(plan) => {
+            println!("\n{}", plan.display(&stop_dir));
         }
-    };
+        None => {
+            println!("\n No route found from {} to {}.", origin_name, dest_name);
+        }
+    }
+
     Ok(())
 }
