@@ -61,20 +61,33 @@ Arriving at 9:00 AM (540 mins): inf minutes total cost
 - [ ] Compile schedules into time-expanded coordinate graph nodes
 - [ ] Handle transit transfers and walking buffers between hubs
 ```
-loaded 64 stations!
+loaded 64 stops!
 
-station: 14th Street (26722) at (40.7373, -73.9968)
-station: 23rd Street (26723) at (40.7429, -73.9928)
-station: 33rd Street (26724) at (40.7491, -73.9883)
-station: 9th Street (26725) at (40.7342, -73.9991)
-station: Christopher Street (26726) at (40.7330, -74.0071)
-station: Exchange Place (26727) at (40.7168, -74.0324)
-station: Grove Street (26728) at (40.7197, -74.0425)
-station: Harrison (26729) at (40.7394, -74.1559)
-station: Hoboken (26730) at (40.7359, -74.0292)
-station: Journal Square (26731) at (40.7330, -74.0629)
+stop: 14th Street (26722) at (40.7373, -73.9968)
+stop: 23rd Street (26723) at (40.7429, -73.9928)
+stop: 33rd Street (26724) at (40.7491, -73.9883)
+stop: 9th Street (26725) at (40.7342, -73.9991)
+stop: Christopher Street (26726) at (40.7330, -74.0071)
+stop: Exchange Place (26727) at (40.7168, -74.0324)
+stop: Grove Street (26728) at (40.7197, -74.0425)
+stop: Harrison (26729) at (40.7394, -74.1559)
+stop: Hoboken (26730) at (40.7359, -74.0292)
+stop: Journal Square (26731) at (40.7330, -74.0629)
 
 loaded 153927 scheduled stop_times!
+
+Grouped into 22369 unique trips!
+
+Trip ID: t_6039263_b_none_tn_4
+  Stop 1 -> Stop Hoboken, departure_time Ok(1006)
+  Stop 2 -> Stop Newport, departure_time Ok(1010)
+  Stop 3 -> Stop Exchange Place, departure_time Ok(1013)
+  Stop 4 -> Stop World Trade Center, departure_time Ok(1017)
+
+Extracted 131558 total transit segments!
+
+Sample connection: Stop Hoboken -> Stop Newport (Trip: t_6039263_b_none_tn_4,
+ Departs: 1006m, Duration: 4m)
 ```
 
 ### Stage 3: The Live Stream (GBFS & Live PATH API Ingestion)

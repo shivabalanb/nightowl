@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -9,12 +11,48 @@ pub struct TransitStop {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct StopDirectory {
+    directory: HashMap<String, TransitStop>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct TransitStopTime {
     pub trip_id: String,
     pub arrival_time: String,
     pub departure_time: String,
     pub stop_id: String,
     pub stop_sequence: u32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct TransitSegmentDetail {
+    pub trip_id: String,
+    pub departure_time: u32,
+    pub travel_time: u32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct TransitSegment {
+    pub from_stop_id: String,
+    pub to_stop_id: String,
+    pub transit_segment_detail: TransitSegmentDetail,
+}
+
+impl StopDirectory {
+    pub fn new(stops: Vec<TransitStop>) -> Self {
+        let mut directory = HashMap::new();
+        for stop in stops {
+            directory.insert(stop.stop_id.clone(), stop);
+        }
+        StopDirectory { directory }
+    }
+
+    pub fn get_name(&self, stop_id: &str) -> &str {
+        self.directory
+            .get(stop_id)
+            .map(|s| s.stop_name.as_str())
+            .unwrap_or("Unknown Stop")
+    }
 }
 
 #[derive(Debug, Clone)]
