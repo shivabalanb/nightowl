@@ -5,13 +5,14 @@ use nightowl::{
         extract_transit_segments, group_stop_times_by_trip, load_transit_stop_times,
         load_transit_stops, parse_time,
     },
-    model::StopDirectory,
+    model::{StopDirectory, TransitGraph},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
+    println!("\n**LOAD TRANSIT STOPS**\n");
     let stops = load_transit_stops("data/path/stops.txt")?;
 
-    println!("loaded {} stops!\n", stops.len());
+    println!("loaded {} stops!", stops.len());
 
     for stop in stops.iter().take(10) {
         println!(
@@ -22,10 +23,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let stop_dir = StopDirectory::new(stops);
 
+    println!("\n**LOAD TRANSIT STOP TIMES**\n");
     let stop_times = load_transit_stop_times("data/path/stop_times.txt")?;
 
-    println!("\nloaded {} scheduled stop_times!\n", stop_times.len());
+    println!("loaded {} scheduled stop_times!", stop_times.len());
 
+    println!("\nGROUP STOP TIMES BY TRIP\n");
     let grouped_trips = group_stop_times_by_trip(stop_times);
     println!("Grouped into {} unique trips!", grouped_trips.len());
 
@@ -41,8 +44,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    println!("\n**EXTRACT TRANSIT SEGMENTS**\n");
     let segments = extract_transit_segments(&grouped_trips);
-    println!("\nExtracted {} total transit segments!", segments.len());
+    println!("Extracted {} total transit segments!", segments.len());
 
     if let Some(first_segment) = segments.first() {
         println!(
@@ -54,5 +58,33 @@ fn main() -> Result<(), Box<dyn Error>> {
             first_segment.transit_segment_detail.travel_time,
         );
     }
+
+    println!("\n**BUILD TRANSIT GRAPH**\n");
+    let transit_graph = TransitGraph::from_segments(segments);
+
+    println!(
+        "Built TransitGraph with {} origin stops!",
+        transit_graph.adjacency_list.len()
+    );
+
+    if let Some((from_id, edges)) = transit_graph.adjacency_list.iter().next() {
+        let origin_name = stop_dir.get_name(from_id);
+        println!(
+            "\nStation: {} ({}) has {} outgoing connections:",
+            origin_name,
+            from_id,
+            edges.len()
+        );
+
+        for edge in edges {
+            let dest_name = stop_dir.get_name(&edge.to_stop_id);
+            println!(
+                "  -> Connection to {} ({}) with {} scheduled departures",
+                dest_name,
+                edge.to_stop_id,
+                edge.departures.len()
+            );
+        }
+    };
     Ok(())
 }

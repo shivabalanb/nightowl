@@ -10,7 +10,7 @@ pub struct TransitStop {
     pub stop_lon: f64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct StopDirectory {
     directory: HashMap<String, TransitStop>,
 }
@@ -24,18 +24,54 @@ pub struct TransitStopTime {
     pub stop_sequence: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct TransitSegmentDetail {
     pub trip_id: String,
     pub departure_time: u32,
     pub travel_time: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct TransitSegment {
     pub from_stop_id: String,
     pub to_stop_id: String,
     pub transit_segment_detail: TransitSegmentDetail,
+}
+
+#[derive(Debug)]
+pub struct TransitEdge {
+    pub to_stop_id: String,
+    pub departures: Vec<TransitSegmentDetail>,
+}
+
+#[derive(Debug)]
+pub struct TransitGraph {
+    pub adjacency_list: HashMap<String, Vec<TransitEdge>>,
+}
+
+impl TransitGraph {
+    pub fn from_segments(segments: Vec<TransitSegment>) -> Self {
+        let mut adjacency_list: HashMap<String, Vec<TransitEdge>> = HashMap::new();
+
+        for segment in segments {
+            let edges = adjacency_list.entry(segment.from_stop_id).or_default();
+            if let Some(existing_edge) = edges
+                .iter_mut()
+                .find(|e| e.to_stop_id == segment.to_stop_id)
+            {
+                existing_edge
+                    .departures
+                    .push(segment.transit_segment_detail);
+            } else {
+                edges.push(TransitEdge {
+                    to_stop_id: segment.to_stop_id,
+                    departures: vec![segment.transit_segment_detail],
+                });
+            }
+        }
+
+        TransitGraph { adjacency_list }
+    }
 }
 
 impl StopDirectory {
