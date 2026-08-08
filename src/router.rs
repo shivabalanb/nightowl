@@ -3,48 +3,61 @@ use std::{
     collections::{BinaryHeap, HashMap},
 };
 
-use crate::{graph::TransitGraph, ingestor::StopDirectory, util::Time};
+use crate::{
+    graph::Graph,
+    ingestor::StopDirectory,
+    util::{Coordinates, Time},
+};
 
-pub struct RouteQuery {
-    pub origin_id: String,
-    pub destination_id: String,
+pub struct Query {
+    pub origin: Coordinates,
+    pub destination: Coordinates,
     pub departure_time: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RouteLeg {
-    pub from_stop_id: String,
-    pub to_stop_id: String,
-    pub trip_id: String,
-    pub departure_time: Time,
-    pub arrival_time: Time,
+pub enum Leg {
+    Transit {
+        from_stop_id: String,
+        to_stop_id: String,
+        trip_id: String,
+        departure_time: Time,
+        arrival_time: Time,
+    },
+    Walk {
+        departure_time: Time,
+        arrival_time: Time,
+    },
 }
 
 #[derive(Debug)]
-pub struct RoutePlan {
+pub struct Plan {
     pub travel_time: Time,
     pub origin_id: String,
     pub destination_id: String,
-    pub legs: Vec<RouteLeg>,
+    pub legs: Vec<Leg>,
 }
 
-pub struct RoutePlanDisplay<'a> {
-    pub plan: &'a RoutePlan,
+pub struct PlanDisplay<'a> {
+    pub plan: &'a Plan,
     pub stops: &'a StopDirectory,
 }
 
-impl RoutePlan {
-    pub fn display<'a>(&'a self, stops: &'a StopDirectory) -> RoutePlanDisplay<'a> {
-        RoutePlanDisplay { plan: self, stops }
+impl Plan {
+    pub fn display<'a>(&'a self, stops: &'a StopDirectory) -> PlanDisplay<'a> {
+        PlanDisplay { plan: self, stops }
     }
 }
 
-impl<'a> std::fmt::Display for RoutePlanDisplay<'a> {
+impl<'a> std::fmt::Display for PlanDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let origin_name = self.stops.get_name(&self.plan.origin_id);
         let dest_name = self.stops.get_name(&self.plan.destination_id);
 
-        writeln!(f, "============================================================")?;
+        writeln!(
+            f,
+            "============================================================"
+        )?;
         writeln!(
             f,
             "  ROUTE: {} ({}) ➔ {} ({})",
@@ -55,20 +68,47 @@ impl<'a> std::fmt::Display for RoutePlanDisplay<'a> {
             "  Total Duration: {} minutes",
             self.plan.travel_time.as_minutes()
         )?;
-        writeln!(f, "============================================================")?;
+        writeln!(
+            f,
+            "============================================================"
+        )?;
 
         for (i, leg) in self.plan.legs.iter().enumerate() {
-            let from_name = self.stops.get_name(&leg.from_stop_id);
-            let to_name = self.stops.get_name(&leg.to_stop_id);
+            match leg {
+                Leg::Transit {
+                    from_stop_id,
+                    to_stop_id,
+                    trip_id,
+                    departure_time,
+                    arrival_time,
+                } => {
+                    let from_name = self.stops.get_name(from_stop_id);
+                    let to_name = self.stops.get_name(to_stop_id);
 
-            writeln!(f, "Leg {}: [Trip ID: {}]", i + 1, leg.trip_id)?;
-            writeln!(f, "   Get On:  {:30} @ {}", from_name, leg.departure_time)?;
-            writeln!(f, "   Get Off: {:30} @ {}", to_name, leg.arrival_time)?;
+                    writeln!(f, "Leg {}: [Trip ID: {}]", i + 1, trip_id)?;
+                    writeln!(f, "   Get On:  {:30} @ {}", from_name, departure_time)?;
+                    writeln!(f, "   Get Off: {:30} @ {}", to_name, arrival_time)?;
+                }
+                Leg::Walk {
+                    departure_time,
+                    arrival_time,
+                } => {
+                    writeln!(f, "Leg {}: [🚶 Walk]", i + 1)?;
+                    writeln!(f, "   Get On:  {:30} @ {}", "Walk", departure_time)?;
+                    writeln!(f, "   Get Off: {:30} @ {}", "Walk", arrival_time)?;
+                }
+            }
             if i + 1 < self.plan.legs.len() {
-                writeln!(f, "------------------------------------------------------------")?;
+                writeln!(
+                    f,
+                    "------------------------------------------------------------"
+                )?;
             }
         }
-        writeln!(f, "============================================================")
+        writeln!(
+            f,
+            "============================================================"
+        )
     }
 }
 
@@ -76,7 +116,7 @@ impl<'a> std::fmt::Display for RoutePlanDisplay<'a> {
 pub struct SearchState {
     pub current_stop_id: String,
     pub current_time: Time,
-    pub path: Vec<RouteLeg>,
+    pub path: Vec<Leg>,
 }
 
 impl Ord for SearchState {
@@ -92,11 +132,11 @@ impl PartialOrd for SearchState {
 }
 
 pub fn find_route(
-    graph: &TransitGraph,
+    graph: &Graph,
     origin_id: &str,
     destination_id: &str,
     departure_time: Time,
-) -> Option<RoutePlan> {
+) -> Option<Plan> {
     let mut pq = BinaryHeap::new();
     let mut best_times: HashMap<String, Time> = HashMap::new();
 
@@ -111,7 +151,7 @@ pub fn find_route(
     while let Some(state) = pq.pop() {
         // 1) check if at destination
         if state.current_stop_id == destination_id {
-            return Some(RoutePlan {
+            return Some(Plan {
                 origin_id: origin_id.to_string(),
                 destination_id: destination_id.to_string(),
                 travel_time: state.current_time - departure_time,
@@ -138,7 +178,7 @@ pub fn find_route(
                         best_times.insert(edge.to_stop_id.clone(), arrival_time);
 
                         let mut new_path = state.path.clone();
-                        new_path.push(RouteLeg {
+                        new_path.push(Leg::Transit {
                             from_stop_id: state.current_stop_id.clone(),
                             to_stop_id: edge.to_stop_id.clone(),
                             trip_id: departure.trip_id.clone(),

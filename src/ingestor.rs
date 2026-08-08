@@ -1,17 +1,38 @@
-use std::{collections::HashMap, error::Error, fmt::Display, path::Path, str::FromStr};
+use std::{collections::HashMap, error::Error, fmt::Display, ops::Deref, path::Path, str::FromStr};
 
 use serde::Deserialize;
 
-use crate::util::Time;
+use crate::util::{Coordinates, Time};
 
 #[derive(Debug, Deserialize)]
-pub struct TransitStop {
+pub struct TransitStopRaw {
     pub stop_id: String,
     pub stop_name: String,
     pub stop_lat: f64,
     pub stop_lon: f64,
     #[serde(default)]
     pub parent_station: String,
+}
+
+#[derive(Debug)]
+pub struct TransitStop {
+    pub raw: TransitStopRaw,
+    pub coordinates: Coordinates,
+}
+
+impl From<TransitStopRaw> for TransitStop {
+    fn from(raw: TransitStopRaw) -> Self {
+        let coordinates = Coordinates::new(raw.stop_lat, raw.stop_lon);
+        Self { raw, coordinates }
+    }
+}
+
+impl Deref for TransitStop {
+    type Target = TransitStopRaw;
+
+    fn deref(&self) -> &Self::Target {
+        &self.raw
+    }
 }
 
 #[derive(Debug)]
@@ -71,7 +92,7 @@ impl Display for StopDirectory {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct TransitStopTime {
+pub struct StopTime {
     pub trip_id: String,
     pub arrival_time: String,
     pub departure_time: String,
@@ -80,17 +101,17 @@ pub struct TransitStopTime {
 }
 
 #[derive(Debug, Clone)]
-pub struct TransitSegmentDetail {
+pub struct SegmentDetail {
     pub trip_id: String,
     pub departure_time: Time,
     pub travel_time: Time,
 }
 
 #[derive(Debug, Clone)]
-pub struct TransitSegment {
+pub struct Segment {
     pub from_stop_id: String,
     pub to_stop_id: String,
-    pub transit_segment_detail: TransitSegmentDetail,
+    pub transit_segment_detail: SegmentDetail,
 }
 
 pub fn load_transit_stops<P: AsRef<Path>>(
@@ -100,8 +121,8 @@ pub fn load_transit_stops<P: AsRef<Path>>(
     let mut stops = Vec::with_capacity(100);
 
     for result in rdr.deserialize() {
-        let stop: TransitStop = result?;
-        stops.push(stop);
+        let stop_raw: TransitStopRaw = result?;
+        stops.push(stop_raw.into());
     }
     Ok(stops)
 }
@@ -109,12 +130,12 @@ pub fn load_transit_stops<P: AsRef<Path>>(
 pub fn load_transit_stop_times<P: AsRef<Path>>(
     file_path: P,
     parent_map: &HashMap<String, String>,
-) -> Result<Vec<TransitStopTime>, Box<dyn Error>> {
+) -> Result<Vec<StopTime>, Box<dyn Error>> {
     let mut rdr = csv::Reader::from_path(file_path)?;
     let mut stop_times = Vec::with_capacity(160_000);
 
     for result in rdr.deserialize() {
-        let mut stop_time: TransitStopTime = result?;
+        let mut stop_time: StopTime = result?;
         if let Some(parent_id) = parent_map.get(&stop_time.stop_id) {
             stop_time.stop_id = parent_id.clone();
         }
@@ -124,9 +145,9 @@ pub fn load_transit_stop_times<P: AsRef<Path>>(
 }
 
 pub fn group_stop_times_by_trip(
-    stop_times: Vec<TransitStopTime>,
-) -> HashMap<String, Vec<TransitStopTime>> {
-    let mut trips: HashMap<String, Vec<TransitStopTime>> = HashMap::new();
+    stop_times: Vec<StopTime>,
+) -> HashMap<String, Vec<StopTime>> {
+    let mut trips: HashMap<String, Vec<StopTime>> = HashMap::new();
 
     for stop_time in stop_times {
         trips
@@ -143,9 +164,9 @@ pub fn group_stop_times_by_trip(
 }
 
 pub fn extract_transit_segments(
-    grouped_stop_times: &HashMap<String, Vec<TransitStopTime>>,
-) -> Vec<TransitSegment> {
-    let mut transit_connections: Vec<TransitSegment> = Vec::new();
+    grouped_stop_times: &HashMap<String, Vec<StopTime>>,
+) -> Vec<Segment> {
+    let mut transit_connections: Vec<Segment> = Vec::new();
     for (trip_id, stop_times) in grouped_stop_times {
         for pair in stop_times.windows(2) {
             let from_stop = &pair[0];
@@ -156,12 +177,12 @@ pub fn extract_transit_segments(
                 Time::from_str(&from_stop.departure_time),
             ) {
                 let travel_time = b_arr_time.saturating_sub(a_dep_time);
-                let transit_segment_detail = TransitSegmentDetail {
+                let transit_segment_detail = SegmentDetail {
                     trip_id: trip_id.clone(),
                     departure_time: a_dep_time,
                     travel_time,
                 };
-                let transit_segment = TransitSegment {
+                let transit_segment = Segment {
                     from_stop_id: from_stop.stop_id.clone(),
                     to_stop_id: to_stop.stop_id.clone(),
                     transit_segment_detail,

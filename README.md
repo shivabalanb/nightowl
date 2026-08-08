@@ -58,7 +58,7 @@ Arriving at 9:00 AM (540 mins): inf minutes total cost
 
 ### Stage 2: The Schedule Compiler (Static GTFS)
 - [x] Parse routes, calendar dates, and travel schedules from GTFS zip feeds
-- [ ] Compile schedules into time-expanded coordinate graph nodes
+- [x] Compile schedules into time-expanded coordinate graph nodes
 - [ ] Handle transit transfers and walking buffers between hubs
 ```
 **LOAD TRANSIT STOPS**

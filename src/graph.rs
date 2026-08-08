@@ -1,19 +1,20 @@
 use std::collections::HashMap;
 
 use crate::{
-    ingestor::{TransitSegment, TransitSegmentDetail},
+    ingestor::{Segment, SegmentDetail},
     util::Time,
 };
 
 #[derive(Debug)]
-pub struct TransitEdgepoint {
+pub struct Edge {
+    pub from_stop_id: String,
     pub to_stop_id: String,
-    pub departures: Vec<TransitSegmentDetail>,
+    pub departures: Vec<SegmentDetail>,
 }
 
-impl TransitEdgepoint {
+impl Edge {
     // returns earliest departure
-    pub fn next_departure(&self, current_time: Time) -> Option<&TransitSegmentDetail> {
+    pub fn next_departure(&self, current_time: Time) -> Option<&SegmentDetail> {
         let idx = self
             .departures
             .partition_point(|d| d.departure_time < current_time);
@@ -22,16 +23,16 @@ impl TransitEdgepoint {
 }
 
 #[derive(Debug)]
-pub struct TransitGraph {
-    pub adjacency_list: HashMap<String, Vec<TransitEdgepoint>>,
+pub struct Graph {
+    pub adjacency_list: HashMap<String, Vec<Edge>>,
 }
 
-impl TransitGraph {
-    pub fn from_segments(segments: Vec<TransitSegment>) -> Self {
-        let mut adjacency_list: HashMap<String, Vec<TransitEdgepoint>> = HashMap::new();
+impl Graph {
+    pub fn from_segments(segments: Vec<Segment>) -> Self {
+        let mut adjacency_list: HashMap<String, Vec<Edge>> = HashMap::new();
 
         for segment in segments {
-            let edges = adjacency_list.entry(segment.from_stop_id).or_default();
+            let edges = adjacency_list.entry(segment.from_stop_id.clone()).or_default();
             if let Some(existing_edge) = edges
                 .iter_mut()
                 .find(|e| e.to_stop_id == segment.to_stop_id)
@@ -40,7 +41,8 @@ impl TransitGraph {
                     .departures
                     .push(segment.transit_segment_detail);
             } else {
-                edges.push(TransitEdgepoint {
+                edges.push(Edge {
+                    from_stop_id: segment.from_stop_id,
                     to_stop_id: segment.to_stop_id,
                     departures: vec![segment.transit_segment_detail],
                 });
@@ -53,6 +55,6 @@ impl TransitGraph {
             }
         }
 
-        TransitGraph { adjacency_list }
+        Graph { adjacency_list }
     }
 }

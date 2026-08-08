@@ -7,22 +7,6 @@ use std::{
 
 const EARTH_RADIUS_MILES: f64 = 3959.0;
 
-pub fn equirectangular_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
-    let lat1_rad = lat1.to_radians();
-    let lon1_rad = lon1.to_radians();
-    let lat2_rad = lat2.to_radians();
-    let lon2_rad = lon2.to_radians();
-
-    let delta_lat = lat1_rad - lat2_rad;
-    let mean_lat = (lat1_rad + lat2_rad) / 2.0;
-    let delta_lon = lon2_rad - lon1_rad;
-
-    let x = delta_lon * mean_lat.cos() * EARTH_RADIUS_MILES;
-    let y = delta_lat * EARTH_RADIUS_MILES;
-
-    (x * x + y * y).sqrt()
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Time(pub u32);
 
@@ -37,6 +21,9 @@ impl Time {
     }
     pub fn saturating_sub(self, rhs: Self) -> Self {
         Self(self.0.saturating_sub(rhs.0))
+    }
+    pub fn duration_to(&self, later_time: Time) -> u32 {
+        later_time.as_minutes().saturating_sub(self.as_minutes())
     }
 }
 
@@ -74,5 +61,28 @@ impl Display for Time {
         let hours = (self.0 / 60) % 24;
         let mins = self.0 % 60;
         write!(f, "{:02}:{:02} EST", hours, mins)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Coordinates {
+    pub lat: f64,
+    pub lon: f64,
+}
+
+impl Coordinates {
+    pub fn new(lat: f64, lon: f64) -> Self {
+        Self { lat, lon }
+    }
+    // equirectanguar distance
+    pub fn distance_to(&self, other: &Coordinates) -> f64 {
+        let delta_lat = self.lat.to_radians() - other.lat.to_radians();
+        let mean_lat = (self.lat.to_radians() + other.lat.to_radians()) / 2.0;
+        let delta_lon = self.lon.to_radians() - other.lon.to_radians();
+
+        let x = delta_lon * mean_lat.cos() * EARTH_RADIUS_MILES;
+        let y = delta_lat * EARTH_RADIUS_MILES;
+
+        (x * x + y * y).sqrt()
     }
 }

@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use nightowl::{
-    graph::TransitGraph,
+    graph::Graph,
     ingestor::{
         StopDirectory, extract_transit_segments, group_stop_times_by_trip, load_transit_stop_times,
         load_transit_stops,
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let segments = extract_transit_segments(&grouped_trips);
 
     println!("\n**BUILD GRAPH**\n");
-    let transit_graph = TransitGraph::from_segments(segments);
+    let transit_graph = Graph::from_segments(segments);
 
     println!(
         "Built graph with {} origin stops!",
