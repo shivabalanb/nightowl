@@ -1,11 +1,3 @@
-
-#[derive(Debug, Clone)]
-pub struct Landmark {
-    pub name: &'static str,
-    pub lat: f64,
-    pub lon: f64,
-}
-
 #[derive(Debug, Clone)]
 pub struct TrainDeparture {
     pub time_of_day: u32, // minutes since midnight

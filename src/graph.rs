@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use crate::{
-    ingestor::{Segment, SegmentDetail},
-    util::Time,
+    ingestor::{Segment, SegmentDetail, StationDirectory},
+    util::{Location, Time},
 };
 
 #[derive(Debug)]
 pub struct Edge {
-    pub from_stop_id: String,
-    pub to_stop_id: String,
+    pub from: Location,
+    pub to: Location,
     pub departures: Vec<SegmentDetail>,
 }
 
@@ -24,26 +24,33 @@ impl Edge {
 
 #[derive(Debug)]
 pub struct Graph {
-    pub adjacency_list: HashMap<String, Vec<Edge>>,
+    pub adjacency_list: HashMap<Location, Vec<Edge>>,
 }
 
 impl Graph {
-    pub fn from_segments(segments: Vec<Segment>) -> Self {
-        let mut adjacency_list: HashMap<String, Vec<Edge>> = HashMap::new();
+    pub fn from_segments(segments: Vec<Segment>, station_dir: &StationDirectory) -> Self {
+        let mut adjacency_list: HashMap<Location, Vec<Edge>> = HashMap::new();
 
         for segment in segments {
-            let edges = adjacency_list.entry(segment.from_stop_id.clone()).or_default();
-            if let Some(existing_edge) = edges
-                .iter_mut()
-                .find(|e| e.to_stop_id == segment.to_stop_id)
-            {
+            let from_loc = match station_dir.get_location(&segment.from_station_id) {
+                Some(loc) => loc,
+                None => continue,
+            };
+            let to_loc = match station_dir.get_location(&segment.to_station_id) {
+                Some(loc) => loc,
+                None => continue,
+            };
+
+            let edges = adjacency_list.entry(from_loc.clone()).or_default();
+
+            if let Some(existing_edge) = edges.iter_mut().find(|e| e.to == to_loc) {
                 existing_edge
                     .departures
                     .push(segment.transit_segment_detail);
             } else {
                 edges.push(Edge {
-                    from_stop_id: segment.from_stop_id,
-                    to_stop_id: segment.to_stop_id,
+                    from: from_loc,
+                    to: to_loc,
                     departures: vec![segment.transit_segment_detail],
                 });
             }

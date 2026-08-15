@@ -2,33 +2,37 @@ use std::{collections::HashMap, error::Error, fmt::Display, ops::Deref, path::Pa
 
 use serde::Deserialize;
 
-use crate::util::{Coordinates, Time};
+use crate::util::{Coordinates, Location, Time};
 
 #[derive(Debug, Deserialize)]
-pub struct TransitStopRaw {
-    pub stop_id: String,
-    pub stop_name: String,
-    pub stop_lat: f64,
-    pub stop_lon: f64,
+pub struct TransitStationRaw {
+    #[serde(rename = "stop_id")]
+    pub station_id: String,
+    #[serde(rename = "stop_name")]
+    pub station_name: String,
+    #[serde(rename = "stop_lat")]
+    pub station_lat: f64,
+    #[serde(rename = "stop_lon")]
+    pub station_lon: f64,
     #[serde(default)]
     pub parent_station: String,
 }
 
 #[derive(Debug)]
-pub struct TransitStop {
-    pub raw: TransitStopRaw,
+pub struct TransitStation {
+    pub raw: TransitStationRaw,
     pub coordinates: Coordinates,
 }
 
-impl From<TransitStopRaw> for TransitStop {
-    fn from(raw: TransitStopRaw) -> Self {
-        let coordinates = Coordinates::new(raw.stop_lat, raw.stop_lon);
+impl From<TransitStationRaw> for TransitStation {
+    fn from(raw: TransitStationRaw) -> Self {
+        let coordinates = Coordinates::new(raw.station_lat, raw.station_lon);
         Self { raw, coordinates }
     }
 }
 
-impl Deref for TransitStop {
-    type Target = TransitStopRaw;
+impl Deref for TransitStation {
+    type Target = TransitStationRaw;
 
     fn deref(&self) -> &Self::Target {
         &self.raw
@@ -36,33 +40,64 @@ impl Deref for TransitStop {
 }
 
 #[derive(Debug)]
-pub struct StopDirectory {
-    directory: HashMap<String, TransitStop>,
+pub struct StationDirectory {
+    directory: HashMap<String, TransitStation>,
     parent_map: HashMap<String, String>,
 }
 
-impl StopDirectory {
-    pub fn new(stops: Vec<TransitStop>) -> Self {
+impl StationDirectory {
+    pub fn new(stations: Vec<TransitStation>) -> Self {
         let mut directory = HashMap::new();
         let mut parent_map = HashMap::new();
 
-        for stop in stops {
-            if !stop.parent_station.is_empty() {
-                parent_map.insert(stop.stop_id.clone(), stop.parent_station.clone());
+        for station in stations {
+            if !station.parent_station.is_empty() {
+                parent_map.insert(station.station_id.clone(), station.parent_station.clone());
             }
-            directory.insert(stop.stop_id.clone(), stop);
+            directory.insert(station.station_id.clone(), station);
         }
-        StopDirectory {
+        StationDirectory {
             directory,
             parent_map,
         }
     }
 
-    pub fn get_name(&self, stop_id: &str) -> &str {
+    pub fn get_name(&self, station_id: &str) -> &str {
         self.directory
-            .get(stop_id)
-            .map(|s| s.stop_name.as_str())
-            .unwrap_or("Unknown Stop")
+            .get(station_id)
+            .map(|s| s.station_name.as_str())
+            .unwrap_or("Unknown Station")
+    }
+
+    pub fn get_station(&self, station_id: &str) -> Option<&TransitStation> {
+        self.directory.get(station_id)
+    }
+
+    pub fn get_location(&self, station_id: &str) -> Option<Location> {
+        self.directory
+            .get(station_id)
+            .map(|station| Location::Station {
+                id: station.station_id.clone(),
+                name: station.station_name.clone(),
+                coords: station.coordinates,
+            })
+    }
+
+    pub fn find_nearby_stations(
+        &self,
+        coords: &Coordinates,
+        max_distance_miles: f64,
+    ) -> Vec<(Location, f64)> {
+        self.directory
+            .values()
+            .filter(|s| s.parent_station.is_empty())
+            .map(|s| {
+                let location = self.get_location(&s.station_id).unwrap();
+                let dist = coords.distance_to(&s.coordinates);
+                (location, dist)
+            })
+            .filter(|(_, dist)| *dist <= max_distance_miles)
+            .collect()
     }
 
     pub fn parent_map(&self) -> &HashMap<String, String> {
@@ -70,21 +105,21 @@ impl StopDirectory {
     }
 }
 
-impl Display for StopDirectory {
+impl Display for StationDirectory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "\n**LOAD TRANSIT STOPS**\n")?;
-        let mut parent_stops: Vec<_> = self
+        writeln!(f, "\n**LOAD TRANSIT STATIONS**\n")?;
+        let mut parent_stations: Vec<_> = self
             .directory
             .values()
             .filter(|s| s.parent_station.is_empty())
             .collect();
-        parent_stops.sort_by_key(|s| &s.stop_id);
+        parent_stations.sort_by_key(|s| &s.station_id);
 
-        for stop in parent_stops {
+        for station in parent_stations {
             writeln!(
                 f,
-                "stop: {} ({}) at ({:.4}, {:.4})",
-                stop.stop_name, stop.stop_id, stop.stop_lat, stop.stop_lon
+                "station: {} ({}) at ({:.4}, {:.4})",
+                station.station_name, station.station_id, station.station_lat, station.station_lon
             )?;
         }
         Ok(())
@@ -109,22 +144,22 @@ pub struct SegmentDetail {
 
 #[derive(Debug, Clone)]
 pub struct Segment {
-    pub from_stop_id: String,
-    pub to_stop_id: String,
+    pub from_station_id: String,
+    pub to_station_id: String,
     pub transit_segment_detail: SegmentDetail,
 }
 
-pub fn load_transit_stops<P: AsRef<Path>>(
+pub fn load_transit_stations<P: AsRef<Path>>(
     file_path: P,
-) -> Result<Vec<TransitStop>, Box<dyn Error>> {
+) -> Result<Vec<TransitStation>, Box<dyn Error>> {
     let mut rdr = csv::Reader::from_path(file_path)?;
-    let mut stops = Vec::with_capacity(100);
+    let mut stations = Vec::with_capacity(100);
 
     for result in rdr.deserialize() {
-        let stop_raw: TransitStopRaw = result?;
-        stops.push(stop_raw.into());
+        let station_raw: TransitStationRaw = result?;
+        stations.push(station_raw.into());
     }
-    Ok(stops)
+    Ok(stations)
 }
 
 pub fn load_transit_stop_times<P: AsRef<Path>>(
@@ -144,9 +179,7 @@ pub fn load_transit_stop_times<P: AsRef<Path>>(
     Ok(stop_times)
 }
 
-pub fn group_stop_times_by_trip(
-    stop_times: Vec<StopTime>,
-) -> HashMap<String, Vec<StopTime>> {
+pub fn group_stop_times_by_trip(stop_times: Vec<StopTime>) -> HashMap<String, Vec<StopTime>> {
     let mut trips: HashMap<String, Vec<StopTime>> = HashMap::new();
 
     for stop_time in stop_times {
@@ -183,8 +216,8 @@ pub fn extract_transit_segments(
                     travel_time,
                 };
                 let transit_segment = Segment {
-                    from_stop_id: from_stop.stop_id.clone(),
-                    to_stop_id: to_stop.stop_id.clone(),
+                    from_station_id: from_stop.stop_id.clone(),
+                    to_station_id: to_stop.stop_id.clone(),
                     transit_segment_detail,
                 };
                 transit_connections.push(transit_segment);
