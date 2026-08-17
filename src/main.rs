@@ -2,49 +2,40 @@ use std::error::Error;
 
 use nightowl::{
     graph::Graph,
-    ingestor::{
-        StationDirectory, extract_transit_segments, group_stop_times_by_trip,
-        load_transit_stations, load_transit_stop_times,
-    },
+    ingestor::StationDirectory,
     router::{Query, find_route},
-    util::{Coordinates, Location, Time},
+    util::{Coordinates, Date, DateTime, Location, Time},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let stations = load_transit_stations("data/path/stops.txt")?;
-    let station_dir = StationDirectory::new(stations);
-
-    let stop_times = load_transit_stop_times("data/path/stop_times.txt", station_dir.parent_map())?;
-
-    let grouped_trips = group_stop_times_by_trip(stop_times);
-
-    let segments = extract_transit_segments(&grouped_trips);
+    let mut station_dir = StationDirectory::new();
+    station_dir.load_from_gtfs("data/path/stops.txt", Some("path"))?;
 
     println!("\n**BUILD GRAPH**\n");
-    let transit_graph = Graph::from_segments(segments, &station_dir);
+    let transit_graph = Graph::from_gtfs_dir("data/path", &station_dir)?;
 
     println!(
-        "Built graph with {} origin stations!",
-        transit_graph.adjacency_list.len()
+        "Built graph with {} origin stations and {} active calendar services!",
+        transit_graph.adjacency_list.len(),
+        transit_graph.calendar.services.len()
     );
 
-    println!("\n**FIND ROUTE**\n");
+    let origin = Location::Point(Coordinates::new(40.730009, -74.034637)); // Newport / Jersey City
+    let destination = Location::Point(Coordinates::new(40.7176003, -73.9863546)); // -73.9863546 Gym, -73.9858367 315 Park Ave S, Manhattan
 
-    let departure_time: Time = "10:22".parse()?;
-
-    let query = Query {
-        origin: Location::Point(Coordinates::new(40.730009, -74.034637)), // Your location
-        destination: Location::Point(Coordinates::new(40.7405842, -73.9858367)), // 315 Park Ave S
-        departure_time,
+    let weekday_query = Query {
+        origin: origin.clone(),
+        destination: destination.clone(),
+        departure_time: DateTime::new(
+            Date::new(2026, 8, 17),
+            Time::from_minutes(19 * 60 + 15),
+        ),
     };
 
-    match find_route(&transit_graph, &station_dir, query) {
-        Some(plan) => {
-            println!("{}", plan);
-        }
-        None => {
-            println!("\n No route found.");
-        }
+    if let Some(plan) = find_route(&transit_graph, &station_dir, weekday_query) {
+        println!("{}", plan);
+    } else {
+        println!("No route found.");
     }
 
     Ok(())

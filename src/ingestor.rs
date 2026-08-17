@@ -1,86 +1,124 @@
-use std::{collections::HashMap, error::Error, fmt::Display, ops::Deref, path::Path, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+    fmt::Display,
+    path::Path,
+    str::FromStr,
+};
 
 use serde::Deserialize;
 
-use crate::util::{Coordinates, Location, Time};
+use crate::util::{Coordinates, Date, DayOfWeek, Location, Time};
 
 #[derive(Debug, Deserialize)]
-pub struct TransitStationRaw {
-    #[serde(rename = "stop_id")]
-    pub station_id: String,
-    #[serde(rename = "stop_name")]
-    pub station_name: String,
-    #[serde(rename = "stop_lat")]
-    pub station_lat: f64,
-    #[serde(rename = "stop_lon")]
-    pub station_lon: f64,
+pub struct StopRaw {
+    pub stop_id: String,
+    pub stop_name: String,
+    pub stop_lat: f64,
+    pub stop_lon: f64,
     #[serde(default)]
     pub parent_station: String,
 }
 
-#[derive(Debug)]
-pub struct TransitStation {
-    pub raw: TransitStationRaw,
+#[derive(Debug, Clone)]
+pub struct Station {
+    pub id: String,
+    pub name: String,
     pub coordinates: Coordinates,
 }
 
-impl From<TransitStationRaw> for TransitStation {
-    fn from(raw: TransitStationRaw) -> Self {
-        let coordinates = Coordinates::new(raw.station_lat, raw.station_lon);
-        Self { raw, coordinates }
+impl Station {
+    pub fn to_location(&self) -> Location {
+        Location::Station {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            coords: self.coordinates,
+        }
+    }
+
+    pub fn boarding_buffer(&self) -> Time {
+        let raw_id = self.id.strip_prefix("path:").unwrap_or(&self.id);
+        match raw_id {
+            "26734" => Time::from_minutes(5),
+            _ => Time::from_minutes(2),
+        }
     }
 }
 
-impl Deref for TransitStation {
-    type Target = TransitStationRaw;
-
-    fn deref(&self) -> &Self::Target {
-        &self.raw
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct StationDirectory {
-    directory: HashMap<String, TransitStation>,
-    parent_map: HashMap<String, String>,
+    stations: HashMap<String, Station>,
+    stop_to_station: HashMap<String, String>,
 }
 
 impl StationDirectory {
-    pub fn new(stations: Vec<TransitStation>) -> Self {
-        let mut directory = HashMap::new();
-        let mut parent_map = HashMap::new();
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-        for station in stations {
-            if !station.parent_station.is_empty() {
-                parent_map.insert(station.station_id.clone(), station.parent_station.clone());
+    pub fn load_from_gtfs<P: AsRef<Path>>(
+        &mut self,
+        file_path: P,
+        agency_prefix: Option<&str>,
+    ) -> Result<(), Box<dyn Error>> {
+        let mut rdr = csv::Reader::from_path(file_path)?;
+        let mut raw_stops: Vec<StopRaw> = Vec::new();
+
+        for result in rdr.deserialize() {
+            raw_stops.push(result?);
+        }
+
+        let prefix_id = |id: &str| -> String {
+            match agency_prefix {
+                Some(p) if !p.is_empty() => format!("{}:{}", p, id),
+                _ => id.to_string(),
             }
-            directory.insert(station.station_id.clone(), station);
+        };
+
+        for stop in &raw_stops {
+            if stop.parent_station.is_empty() {
+                let station_id = prefix_id(&stop.stop_id);
+                self.stations.insert(
+                    station_id.clone(),
+                    Station {
+                        id: station_id.clone(),
+                        name: stop.stop_name.clone(),
+                        coordinates: Coordinates::new(stop.stop_lat, stop.stop_lon),
+                    },
+                );
+                self.stop_to_station
+                    .insert(stop.stop_id.clone(), station_id);
+            }
         }
-        StationDirectory {
-            directory,
-            parent_map,
+
+        for stop in &raw_stops {
+            if !stop.parent_station.is_empty() {
+                let parent_id = prefix_id(&stop.parent_station);
+                self.stop_to_station
+                    .insert(stop.stop_id.clone(), parent_id);
+            }
         }
+
+        Ok(())
+    }
+
+    pub fn resolve_stop_to_station(&self, stop_id: &str) -> Option<&str> {
+        self.stop_to_station.get(stop_id).map(|s| s.as_str())
+    }
+
+    pub fn get_station(&self, station_id: &str) -> Option<&Station> {
+        self.stations.get(station_id)
     }
 
     pub fn get_name(&self, station_id: &str) -> &str {
-        self.directory
+        self.stations
             .get(station_id)
-            .map(|s| s.station_name.as_str())
+            .map(|s| s.name.as_str())
             .unwrap_or("Unknown Station")
     }
 
-    pub fn get_station(&self, station_id: &str) -> Option<&TransitStation> {
-        self.directory.get(station_id)
-    }
-
     pub fn get_location(&self, station_id: &str) -> Option<Location> {
-        self.directory
-            .get(station_id)
-            .map(|station| Location::Station {
-                id: station.station_id.clone(),
-                name: station.station_name.clone(),
-                coords: station.coordinates,
-            })
+        self.stations.get(station_id).map(|s| s.to_location())
     }
 
     pub fn find_nearby_stations(
@@ -88,141 +126,150 @@ impl StationDirectory {
         coords: &Coordinates,
         max_distance_miles: f64,
     ) -> Vec<(Location, f64)> {
-        self.directory
+        self.stations
             .values()
-            .filter(|s| s.parent_station.is_empty())
             .map(|s| {
-                let location = self.get_location(&s.station_id).unwrap();
+                let location = s.to_location();
                 let dist = coords.distance_to(&s.coordinates);
                 (location, dist)
             })
             .filter(|(_, dist)| *dist <= max_distance_miles)
             .collect()
     }
-
-    pub fn parent_map(&self) -> &HashMap<String, String> {
-        &self.parent_map
-    }
 }
 
 impl Display for StationDirectory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "\n**LOAD TRANSIT STATIONS**\n")?;
-        let mut parent_stations: Vec<_> = self
-            .directory
-            .values()
-            .filter(|s| s.parent_station.is_empty())
-            .collect();
-        parent_stations.sort_by_key(|s| &s.station_id);
+        let mut stations: Vec<_> = self.stations.values().collect();
+        stations.sort_by_key(|s| &s.id);
 
-        for station in parent_stations {
+        for station in stations {
             writeln!(
                 f,
                 "station: {} ({}) at ({:.4}, {:.4})",
-                station.station_name, station.station_id, station.station_lat, station.station_lon
+                station.name, station.id, station.coordinates.lat, station.coordinates.lon
             )?;
         }
         Ok(())
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct StopTime {
-    pub trip_id: String,
-    pub arrival_time: String,
-    pub departure_time: String,
-    pub stop_id: String,
-    pub stop_sequence: u32,
+#[derive(Debug, Deserialize)]
+pub struct CalendarRaw {
+    pub service_id: String,
+    #[serde(default)]
+    pub monday: u8,
+    #[serde(default)]
+    pub tuesday: u8,
+    #[serde(default)]
+    pub wednesday: u8,
+    #[serde(default)]
+    pub thursday: u8,
+    #[serde(default)]
+    pub friday: u8,
+    #[serde(default)]
+    pub saturday: u8,
+    #[serde(default)]
+    pub sunday: u8,
+    pub start_date: String,
+    pub end_date: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct SegmentDetail {
-    pub trip_id: String,
-    pub departure_time: Time,
-    pub travel_time: Time,
+pub struct CalendarService {
+    pub service_id: String,
+    pub monday: bool,
+    pub tuesday: bool,
+    pub wednesday: bool,
+    pub thursday: bool,
+    pub friday: bool,
+    pub saturday: bool,
+    pub sunday: bool,
+    pub start_date: Date,
+    pub end_date: Date,
 }
 
-#[derive(Debug, Clone)]
-pub struct Segment {
-    pub from_station_id: String,
-    pub to_station_id: String,
-    pub transit_segment_detail: SegmentDetail,
-}
-
-pub fn load_transit_stations<P: AsRef<Path>>(
-    file_path: P,
-) -> Result<Vec<TransitStation>, Box<dyn Error>> {
-    let mut rdr = csv::Reader::from_path(file_path)?;
-    let mut stations = Vec::with_capacity(100);
-
-    for result in rdr.deserialize() {
-        let station_raw: TransitStationRaw = result?;
-        stations.push(station_raw.into());
-    }
-    Ok(stations)
-}
-
-pub fn load_transit_stop_times<P: AsRef<Path>>(
-    file_path: P,
-    parent_map: &HashMap<String, String>,
-) -> Result<Vec<StopTime>, Box<dyn Error>> {
-    let mut rdr = csv::Reader::from_path(file_path)?;
-    let mut stop_times = Vec::with_capacity(160_000);
-
-    for result in rdr.deserialize() {
-        let mut stop_time: StopTime = result?;
-        if let Some(parent_id) = parent_map.get(&stop_time.stop_id) {
-            stop_time.stop_id = parent_id.clone();
+impl CalendarService {
+    pub fn runs_on(&self, day_of_week: DayOfWeek) -> bool {
+        match day_of_week {
+            DayOfWeek::Monday => self.monday,
+            DayOfWeek::Tuesday => self.tuesday,
+            DayOfWeek::Wednesday => self.wednesday,
+            DayOfWeek::Thursday => self.thursday,
+            DayOfWeek::Friday => self.friday,
+            DayOfWeek::Saturday => self.saturday,
+            DayOfWeek::Sunday => self.sunday,
         }
-        stop_times.push(stop_time);
     }
-    Ok(stop_times)
+
+    pub fn is_active_on(&self, date: &Date) -> bool {
+        if *date < self.start_date || *date > self.end_date {
+            return false;
+        }
+        self.runs_on(date.day_of_week())
+    }
 }
 
-pub fn group_stop_times_by_trip(stop_times: Vec<StopTime>) -> HashMap<String, Vec<StopTime>> {
-    let mut trips: HashMap<String, Vec<StopTime>> = HashMap::new();
-
-    for stop_time in stop_times {
-        trips
-            .entry(stop_time.trip_id.clone())
-            .or_default()
-            .push(stop_time);
-    }
-
-    for stops in trips.values_mut() {
-        stops.sort_by_key(|s| s.stop_sequence);
-    }
-
-    trips
+#[derive(Debug, Default, Clone)]
+pub struct Calendar {
+    pub services: HashMap<String, CalendarService>,
 }
 
-pub fn extract_transit_segments(
-    grouped_stop_times: &HashMap<String, Vec<StopTime>>,
-) -> Vec<Segment> {
-    let mut transit_connections: Vec<Segment> = Vec::new();
-    for (trip_id, stop_times) in grouped_stop_times {
-        for pair in stop_times.windows(2) {
-            let from_stop = &pair[0];
-            let to_stop = &pair[1];
+impl Calendar {
+    pub fn load_from_gtfs<P: AsRef<Path>>(file_path: P) -> Result<Self, Box<dyn Error>> {
+        let mut rdr = csv::Reader::from_path(file_path)?;
+        let mut services = HashMap::new();
 
-            if let (Ok(b_arr_time), Ok(a_dep_time)) = (
-                Time::from_str(&to_stop.arrival_time),
-                Time::from_str(&from_stop.departure_time),
+        for result in rdr.deserialize() {
+            let raw: CalendarRaw = result?;
+            if let (Ok(start_date), Ok(end_date)) = (
+                Date::from_str(&raw.start_date),
+                Date::from_str(&raw.end_date),
             ) {
-                let travel_time = b_arr_time.saturating_sub(a_dep_time);
-                let transit_segment_detail = SegmentDetail {
-                    trip_id: trip_id.clone(),
-                    departure_time: a_dep_time,
-                    travel_time,
-                };
-                let transit_segment = Segment {
-                    from_station_id: from_stop.stop_id.clone(),
-                    to_station_id: to_stop.stop_id.clone(),
-                    transit_segment_detail,
-                };
-                transit_connections.push(transit_segment);
-            };
+                services.insert(
+                    raw.service_id.clone(),
+                    CalendarService {
+                        service_id: raw.service_id,
+                        monday: raw.monday == 1,
+                        tuesday: raw.tuesday == 1,
+                        wednesday: raw.wednesday == 1,
+                        thursday: raw.thursday == 1,
+                        friday: raw.friday == 1,
+                        saturday: raw.saturday == 1,
+                        sunday: raw.sunday == 1,
+                        start_date,
+                        end_date,
+                    },
+                );
+            }
         }
+        Ok(Calendar { services })
     }
-    transit_connections
+
+    pub fn active_services_for_date(&self, date: &Date) -> HashSet<String> {
+        self.services
+            .values()
+            .filter(|s| s.is_active_on(date))
+            .map(|s| s.service_id.clone())
+            .collect()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct TripRaw {
+    pub trip_id: String,
+    pub service_id: String,
+}
+
+pub fn load_trip_services<P: AsRef<Path>>(
+    file_path: P,
+) -> Result<HashMap<String, String>, Box<dyn Error>> {
+    let mut rdr = csv::Reader::from_path(file_path)?;
+    let mut trip_to_service = HashMap::new();
+    for result in rdr.deserialize() {
+        let trip: TripRaw = result?;
+        trip_to_service.insert(trip.trip_id, trip.service_id);
+    }
+    Ok(trip_to_service)
 }

@@ -7,6 +7,130 @@ use std::{
 
 const EARTH_RADIUS_MILES: f64 = 3959.0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DayOfWeek {
+    Monday,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday,
+    Sunday,
+}
+
+impl Display for DayOfWeek {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DayOfWeek::Monday => write!(f, "Monday"),
+            DayOfWeek::Tuesday => write!(f, "Tuesday"),
+            DayOfWeek::Wednesday => write!(f, "Wednesday"),
+            DayOfWeek::Thursday => write!(f, "Thursday"),
+            DayOfWeek::Friday => write!(f, "Friday"),
+            DayOfWeek::Saturday => write!(f, "Saturday"),
+            DayOfWeek::Sunday => write!(f, "Sunday"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Date {
+    pub year: u32,
+    pub month: u32,
+    pub day: u32,
+}
+
+impl Date {
+    pub fn new(year: u32, month: u32, day: u32) -> Self {
+        Self { year, month, day }
+    }
+
+    /// Calculates day of the week using Sakamoto's algorithm
+    pub fn day_of_week(&self) -> DayOfWeek {
+        let t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
+        let mut y = self.year;
+        if self.month < 3 {
+            y -= 1;
+        }
+        let d = (y + y / 4 - y / 100 + y / 400 + t[(self.month - 1) as usize] + self.day) % 7;
+        match d {
+            0 => DayOfWeek::Sunday,
+            1 => DayOfWeek::Monday,
+            2 => DayOfWeek::Tuesday,
+            3 => DayOfWeek::Wednesday,
+            4 => DayOfWeek::Thursday,
+            5 => DayOfWeek::Friday,
+            6 => DayOfWeek::Saturday,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Next calendar day
+    pub fn next_day(&self) -> Self {
+        let days_in_month = match self.month {
+            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+            4 | 6 | 9 | 11 => 30,
+            2 => {
+                let is_leap =
+                    (self.year % 4 == 0 && self.year % 100 != 0) || (self.year % 400 == 0);
+                if is_leap {
+                    29
+                } else {
+                    28
+                }
+            }
+            _ => 30,
+        };
+
+        if self.day < days_in_month {
+            Date {
+                year: self.year,
+                month: self.month,
+                day: self.day + 1,
+            }
+        } else if self.month < 12 {
+            Date {
+                year: self.year,
+                month: self.month + 1,
+                day: 1,
+            }
+        } else {
+            Date {
+                year: self.year + 1,
+                month: 1,
+                day: 1,
+            }
+        }
+    }
+}
+
+impl FromStr for Date {
+    type Err = Box<dyn Error>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let clean = s.trim();
+        if clean.len() == 8 && clean.chars().all(|c| c.is_ascii_digit()) {
+            let year: u32 = clean[0..4].parse()?;
+            let month: u32 = clean[4..6].parse()?;
+            let day: u32 = clean[6..8].parse()?;
+            Ok(Date { year, month, day })
+        } else if clean.contains('-') {
+            let mut parts = clean.split('-');
+            let year: u32 = parts.next().ok_or("missing year")?.parse()?;
+            let month: u32 = parts.next().ok_or("missing month")?.parse()?;
+            let day: u32 = parts.next().ok_or("missing day")?.parse()?;
+            Ok(Date { year, month, day })
+        } else {
+            Err(format!("invalid date format: {}", s).into())
+        }
+    }
+}
+
+impl Display for Date {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:04}-{:02}-{:02}", self.year, self.month, self.day)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Time(pub u32);
 
@@ -64,6 +188,47 @@ impl Display for Time {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DateTime {
+    pub date: Date,
+    pub time: Time,
+}
+
+impl DateTime {
+    pub fn new(date: Date, time: Time) -> Self {
+        Self { date, time }
+    }
+
+    pub fn add_minutes(&self, minutes: u32) -> Self {
+        let total_mins = self.time.as_minutes() + minutes;
+        let days_to_add = total_mins / 1440;
+        let rem_mins = total_mins % 1440;
+
+        let mut date = self.date;
+        for _ in 0..days_to_add {
+            date = date.next_day();
+        }
+
+        DateTime {
+            date,
+            time: Time::from_minutes(rem_mins),
+        }
+    }
+}
+
+impl Add<Time> for DateTime {
+    type Output = Self;
+    fn add(self, rhs: Time) -> Self {
+        self.add_minutes(rhs.as_minutes())
+    }
+}
+
+impl Display for DateTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} ({})", self.date, self.time, self.date.day_of_week())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Coordinates {
     pub lat: f64,
@@ -83,7 +248,6 @@ impl Coordinates {
     pub fn new(lat: f64, lon: f64) -> Self {
         Self { lat, lon }
     }
-    // East-West (x) and North-South (y) distances in miles via equirectangular projection
     fn planar_offset_miles(&self, other: &Coordinates) -> (f64, f64) {
         let delta_lat = self.lat.to_radians() - other.lat.to_radians();
         let mean_lat = (self.lat.to_radians() + other.lat.to_radians()) / 2.0;
@@ -94,13 +258,11 @@ impl Coordinates {
         (x, y)
     }
 
-    // Euclidean distance
     pub fn distance_to(&self, other: &Coordinates) -> f64 {
         let (x, y) = self.planar_offset_miles(other);
         (x * x + y * y).sqrt()
     }
 
-    // Manhattan grid distance
     pub fn manhattan_distance_to(&self, other: &Coordinates) -> f64 {
         let (x, y) = self.planar_offset_miles(other);
         x + y
@@ -154,7 +316,7 @@ impl Location {
 
     pub fn walk_duration(&self, other: &Location) -> Time {
         let dist_miles = self.walk_miles(other);
-        let minutes = (dist_miles * 24.0).round() as u32; // 2.5mph (24 mins/mile, accounts for traffic lights)
+        let minutes = (dist_miles * 24.0).round() as u32;
         Time::from_minutes(minutes)
     }
 
