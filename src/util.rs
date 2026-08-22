@@ -6,6 +6,8 @@ use std::{
 };
 
 const EARTH_RADIUS_MILES: f64 = 3959.0;
+const WALKING_SPEED: f64 = 22.0; // 22 mins/mile
+const BIKING_SPEED: f64 = 7.0; // 7 mins/mile
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DayOfWeek {
@@ -72,11 +74,7 @@ impl Date {
             2 => {
                 let is_leap =
                     (self.year % 4 == 0 && self.year % 100 != 0) || (self.year % 400 == 0);
-                if is_leap {
-                    29
-                } else {
-                    28
-                }
+                if is_leap { 29 } else { 28 }
             }
             _ => 30,
         };
@@ -225,7 +223,13 @@ impl Add<Time> for DateTime {
 
 impl Display for DateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} ({})", self.date, self.time, self.date.day_of_week())
+        write!(
+            f,
+            "{} {} ({})",
+            self.date,
+            self.time,
+            self.date.day_of_week()
+        )
     }
 }
 
@@ -316,7 +320,7 @@ impl Location {
 
     pub fn walk_duration(&self, other: &Location) -> Time {
         let dist_miles = self.walk_miles(other);
-        let minutes = (dist_miles * 24.0).round() as u32;
+        let minutes = (dist_miles * WALKING_SPEED).round() as u32;
         Time::from_minutes(minutes)
     }
 

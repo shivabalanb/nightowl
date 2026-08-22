@@ -4,8 +4,7 @@ use std::{
 };
 
 use crate::{
-    graph::Graph,
-    ingestor::StationDirectory,
+    transit_network::TransitNetwork,
     util::{DateTime, Location, Time},
 };
 
@@ -251,7 +250,10 @@ impl PartialOrd for SearchState {
     }
 }
 
-pub fn find_route(graph: &Graph, station_dir: &StationDirectory, query: Query) -> Option<Plan> {
+pub fn find_route(
+    transit: &TransitNetwork,
+    query: Query,
+) -> Option<Plan> {
     let mut pq = BinaryHeap::new();
     let mut best_times: HashMap<Location, DateTime> = HashMap::new();
 
@@ -289,7 +291,7 @@ pub fn find_route(graph: &Graph, station_dir: &StationDirectory, query: Query) -
         // 3) Explore edges
         // I - Walk to nearby stations
         let start_stations =
-            station_dir.find_nearby_stations(&state.current_location.get_coordinates(), 1.0);
+            transit.stations.find_nearby_stations(&state.current_location.get_coordinates(), 1.0);
         for (station, station_dist_miles) in start_stations {
             let mut new_path = state.path.clone();
             let arrival_time = state.current_time + state.current_location.walk_duration(&station);
@@ -317,11 +319,9 @@ pub fn find_route(graph: &Graph, station_dir: &StationDirectory, query: Query) -
         }
 
         // II - Transit: Station to station (day-aware + 2-min boarding buffer)
-        let active_services = graph
-            .calendar
-            .active_services_for_date(&state.current_time.date);
+        let active_services = transit.schedule.active_services_for_date(&state.current_time.date);
 
-        if let Some(edges) = graph.adjacency_list.get(&state.current_location) {
+        if let Some(edges) = transit.graph.adjacency_list.get(&state.current_location) {
             for edge in edges {
                 // If we are already on this train, no boarding buffer needed
                 let is_staying_on_train = match state.path.last() {
@@ -332,7 +332,7 @@ pub fn find_route(graph: &Graph, station_dir: &StationDirectory, query: Query) -
                 };
 
                 let buffer = match &state.current_location {
-                    Location::Station { id, .. } => station_dir
+                    Location::Station { id, .. } => transit.stations
                         .get_station(id)
                         .map_or(Time::from_minutes(2), |s| s.boarding_buffer()),
                     _ => Time::from_minutes(2),

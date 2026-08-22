@@ -8,7 +8,7 @@ use std::{
 use serde::Deserialize;
 
 use crate::{
-    ingestor::{Calendar, StationDirectory, load_trip_services},
+    ingestor::{Schedule, TransitStationDirectory},
     util::{Location, Time},
 };
 
@@ -51,31 +51,22 @@ impl Edge {
 #[derive(Debug)]
 pub struct Graph {
     pub adjacency_list: HashMap<Location, Vec<Edge>>,
-    pub calendar: Calendar,
 }
 
 impl Graph {
     pub fn from_gtfs_dir<P: AsRef<Path>>(
         dir: P,
-        station_dir: &StationDirectory,
+        station_dir: &TransitStationDirectory,
+        schedule: &Schedule,
     ) -> Result<Self, Box<dyn Error>> {
-        let dir_path = dir.as_ref();
-        let trips_path = dir_path.join("trips.txt");
-        let stop_times_path = dir_path.join("stop_times.txt");
-        let calendar_path = dir_path.join("calendar.txt");
-
-        Self::from_gtfs_files(trips_path, stop_times_path, calendar_path, station_dir)
+        Self::from_gtfs_file(dir.as_ref().join("stop_times.txt"), station_dir, schedule)
     }
 
-    pub fn from_gtfs_files<P1: AsRef<Path>, P2: AsRef<Path>, P3: AsRef<Path>>(
-        trips_path: P1,
-        stop_times_path: P2,
-        calendar_path: P3,
-        station_dir: &StationDirectory,
+    pub fn from_gtfs_file<P: AsRef<Path>>(
+        stop_times_path: P,
+        station_dir: &TransitStationDirectory,
+        schedule: &Schedule,
     ) -> Result<Self, Box<dyn Error>> {
-        let calendar = Calendar::load_from_gtfs(calendar_path)?;
-        let trip_services = load_trip_services(trips_path)?;
-
         let mut rdr = csv::Reader::from_path(stop_times_path)?;
         let mut trips: HashMap<String, Vec<(u32, String, Time, Time)>> = HashMap::new();
 
@@ -99,7 +90,7 @@ impl Graph {
 
         for (trip_id, mut stops) in trips {
             stops.sort_by_key(|s| s.0);
-            let service_id = trip_services.get(&trip_id).cloned().unwrap_or_default();
+            let service_id = schedule.get_service_id(&trip_id).unwrap_or_default().to_string();
 
             for window in stops.windows(2) {
                 let (_, ref from_id, _, from_dep) = window[0];
@@ -144,9 +135,6 @@ impl Graph {
             }
         }
 
-        Ok(Graph {
-            adjacency_list,
-            calendar,
-        })
+        Ok(Graph { adjacency_list })
     }
 }
