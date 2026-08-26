@@ -94,9 +94,46 @@ Leg 6: [🚶 Walk (0.52 mi, 13 mins)]
 
 ### Stage 3: Micro-Mobility & Real-Time Streams (CitiBike GBFS & Delays)
 - [ ] Ingest CitiBike GBFS live feeds (real-time dock availability & bike locations)
-- [ ] Add `Leg::Bike` modality with dock pick-up/drop-off constraints
+- [x] Add `Leg::Bike` modality with dock pick-up/drop-off constraints
 - [ ] Incorporate live delay feeds to adjust active transit edges dynamically
-
+```====================================================================
+  ROUTE: Point (40.7220, -74.0369) ➔ Point (40.7172, -73.9864)
+  Date:           2026-08-17 (Monday)
+  Departure:      19:15 EST
+  Arrival:        19:51 EST
+  Total Duration: 36 mins
+====================================================================
+Leg 1: [🚶 Walk to Bike Dock (0.18 mi, 4 mins)]
+   Start:   Point (40.7220, -74.0369)                @ 19:15 EST
+   End:     Washington St & Morgan St (Citi Bike)    @ 19:19 EST
+--------------------------------------------------------------------
+Leg 2: [🚲 Bike (0.25 mi, 3 mins)]
+   Unlock:  Washington St & Morgan St (Citi Bike)    @ 19:19 EST
+   Dock:    Exchange Pl (Citi Bike)                  @ 19:22 EST
+--------------------------------------------------------------------
+Leg 3: [🚶 Walk to Station (0.11 mi, 3 mins)]
+   Start:   Exchange Pl (Citi Bike)                  @ 19:22 EST
+   End:     Exchange Place (PATH)                    @ 19:25 EST
+--------------------------------------------------------------------
+   ⏳ Wait 6 mins at Exchange Place (PATH)
+--------------------------------------------------------------------
+Leg 4: [🚆 Transit (t_6039055_b_84435_tn_37) - 5 mins, 1 stop]
+   Board:   Exchange Place (PATH)                    @ 19:31 EST
+   Alight:  World Trade Center (PATH)                @ 19:36 EST
+--------------------------------------------------------------------
+Leg 5: [🚶 Walk to Bike Dock (0.04 mi, 1 mins)]
+   Start:   World Trade Center (PATH)                @ 19:36 EST
+   End:     Vesey St & Greenwich St (Citi Bike)      @ 19:37 EST
+--------------------------------------------------------------------
+Leg 6: [🚲 Bike (1.28 mi, 11 mins)]
+   Unlock:  Vesey St & Greenwich St (Citi Bike)      @ 19:37 EST
+   Dock:    Clinton St & Grand St (Citi Bike)        @ 19:48 EST
+--------------------------------------------------------------------
+Leg 7: [🚶 Walk to Destination (0.13 mi, 3 mins)]
+   Start:   Clinton St & Grand St (Citi Bike)        @ 19:48 EST
+   End:     Point (40.7172, -73.9864)                @ 19:51 EST
+====================================================================
+```
 ### Stage 4: Light Rail Expansion (Hudson-Bergen Light Rail)
 - [ ] Ingest Hudson-Bergen Light Rail (HBLR) GTFS static schedules
 - [ ] Support PATH $\leftrightarrow$ Light Rail transfer stations (Exchange Place, Newport, Hoboken)

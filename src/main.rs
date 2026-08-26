@@ -1,38 +1,40 @@
 use std::error::Error;
 
 use nightowl::{
+    bike_network::BikeNetwork,
     router::{Query, find_route},
     transit_network::TransitNetwork,
-    util::{Coordinates, Date, DateTime, Location, Time},
+    util::{Coordinates, Location},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("\n**LOAD TRANSIT NETWORK**\n");
+    println!("\n**LOAD NETWORKS**\n");
     let transit = TransitNetwork::from_gtfs_dir("data/path", Some("path"))?;
+    let bike = BikeNetwork::from_gbfs("data/citibike", Some("citibike"))?;
 
     println!(
-        "Built transit network with {} stations, {} graph nodes, and {} calendar services!",
-        transit
-            .stations
-            .find_nearby_stations(&Coordinates::new(40.73, -74.03), 100.0)
-            .len(),
+        "Transit Network: {} stations, {} graph nodes, {} calendar services",
+        transit.stations.stations.len(),
         transit.graph.adjacency_list.len(),
         transit.schedule.services.len()
     );
 
-    let origin = Location::Point(Coordinates::new(40.730009, -74.034637)); // Newport / Jersey City
-    let destination = Location::Point(Coordinates::new(40.7176003, -73.9863546)); // -73.9863546 Gym, -73.9858367 315 Park Ave S, Manhattan
+    println!(
+        "Bike Network:    {} Citi Bike docks loaded!\n",
+        bike.stations.len()
+    );
 
-    let weekday_query = Query {
-        origin: origin.clone(),
-        destination: destination.clone(),
-        departure_time: DateTime::new(Date::new(2026, 8, 17), Time::from_minutes(19 * 60 + 15)),
-    };
+    let origin = Location::Point(Coordinates::new(40.72204775835277, -74.0368774356056)); // Home 
+    let destination = Location::Point(Coordinates::new(40.71721004390394, -73.98642630279129)); // Vital LES
 
-    if let Some(plan) = find_route(&transit, weekday_query) {
+    // Defaults to right now (current local time)
+    let query_now = Query::new(origin.clone(), destination.clone());
+
+    println!("Querying with departure_time = None (defaults to right now: {}):", query_now.get_departure_time());
+    if let Some(plan) = find_route(&transit, &bike, query_now) {
         println!("{}", plan);
     } else {
-        println!("No route found.");
+        println!("No route found for current time.");
     }
 
     Ok(())

@@ -192,9 +192,24 @@ pub struct DateTime {
     pub time: Time,
 }
 
+impl Default for DateTime {
+    fn default() -> Self {
+        Self::now()
+    }
+}
+
 impl DateTime {
     pub fn new(date: Date, time: Time) -> Self {
         Self { date, time }
+    }
+
+    pub fn now() -> Self {
+        use chrono::{Datelike, Timelike};
+        let now = chrono::Local::now();
+        DateTime {
+            date: Date::new(now.year() as u32, now.month(), now.day()),
+            time: Time::from_minutes(now.hour() * 60 + now.minute()),
+        }
     }
 
     pub fn add_minutes(&self, minutes: u32) -> Self {
@@ -329,9 +344,38 @@ impl Location {
             .manhattan_distance_to(&other.get_coordinates())
     }
 
+    pub fn bike_duration(&self, other: &Location) -> Time {
+        let dist_miles = self.bike_miles(other);
+        let minutes = (dist_miles * BIKING_SPEED).round() as u32;
+        Time::from_minutes(minutes)
+    }
+
+    pub fn bike_miles(&self, other: &Location) -> f64 {
+        self.get_coordinates()
+            .manhattan_distance_to(&other.get_coordinates())
+    }
+
+    pub fn is_bike_dock(&self) -> bool {
+        matches!(self, Location::Station { id, .. } if id.starts_with("citibike:"))
+    }
+
+    pub fn is_transit_station(&self) -> bool {
+        matches!(self, Location::Station { id, .. } if !id.starts_with("citibike:"))
+    }
+
     pub fn name(&self) -> String {
         match self {
-            Location::Station { name, .. } => name.clone(),
+            Location::Station { id, name, .. } => {
+                if id.starts_with("citibike:") {
+                    format!("{} (Citi Bike)", name)
+                } else if id.starts_with("path:") {
+                    format!("{} (PATH)", name)
+                } else if id.starts_with("hblr:") {
+                    format!("{} (HBLR)", name)
+                } else {
+                    name.clone()
+                }
+            }
             Location::Point(coords) => format!("Point ({:.4}, {:.4})", coords.lat, coords.lon),
         }
     }

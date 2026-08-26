@@ -8,7 +8,7 @@ use std::{
 use serde::Deserialize;
 
 use crate::{
-    ingestor::{Schedule, TransitStationDirectory},
+    transit_network::{Schedule, TransitStationDirectory},
     util::{Location, Time},
 };
 

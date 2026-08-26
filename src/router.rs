@@ -4,14 +4,35 @@ use std::{
 };
 
 use crate::{
+    bike_network::BikeNetwork,
     transit_network::TransitNetwork,
     util::{DateTime, Location, Time},
 };
 
+#[derive(Debug, Clone)]
 pub struct Query {
     pub origin: Location,
     pub destination: Location,
-    pub departure_time: DateTime,
+    pub departure_time: Option<DateTime>,
+}
+
+impl Query {
+    pub fn new(origin: Location, destination: Location) -> Self {
+        Self {
+            origin,
+            destination,
+            departure_time: None,
+        }
+    }
+
+    pub fn with_departure_time(mut self, departure_time: DateTime) -> Self {
+        self.departure_time = Some(departure_time);
+        self
+    }
+
+    pub fn get_departure_time(&self) -> DateTime {
+        self.departure_time.unwrap_or_default()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -31,6 +52,13 @@ pub enum Leg {
         departure_time: DateTime,
         arrival_time: DateTime,
     },
+    Bike {
+        from: Location,
+        to: Location,
+        distance_miles: f64,
+        departure_time: DateTime,
+        arrival_time: DateTime,
+    },
 }
 
 impl Leg {
@@ -38,6 +66,7 @@ impl Leg {
         match self {
             Leg::Transit { from, .. } => from,
             Leg::Walk { from, .. } => from,
+            Leg::Bike { from, .. } => from,
         }
     }
 
@@ -45,6 +74,7 @@ impl Leg {
         match self {
             Leg::Transit { to, .. } => to,
             Leg::Walk { to, .. } => to,
+            Leg::Bike { to, .. } => to,
         }
     }
 
@@ -52,6 +82,7 @@ impl Leg {
         match self {
             Leg::Transit { departure_time, .. } => *departure_time,
             Leg::Walk { departure_time, .. } => *departure_time,
+            Leg::Bike { departure_time, .. } => *departure_time,
         }
     }
 
@@ -59,6 +90,7 @@ impl Leg {
         match self {
             Leg::Transit { arrival_time, .. } => *arrival_time,
             Leg::Walk { arrival_time, .. } => *arrival_time,
+            Leg::Bike { arrival_time, .. } => *arrival_time,
         }
     }
 }
@@ -142,7 +174,6 @@ impl std::fmt::Display for Plan {
         )?;
 
         for (i, leg) in self.legs.iter().enumerate() {
-            // Check for wait time before this leg
             if i > 0 {
                 let prev_arr = self.legs[i - 1].arrival_time().time.as_minutes();
                 let curr_dep = leg.departure_time().time.as_minutes();
@@ -183,8 +214,13 @@ impl std::fmt::Display for Plan {
                         ride_mins,
                         stop_label
                     )?;
-                    writeln!(f, "   Board:   {:32} @ {}", from.name(), departure_time.time)?;
-                    writeln!(f, "   Alight:  {:32} @ {}", to.name(), arrival_time.time)?;
+                    writeln!(
+                        f,
+                        "   Board:   {:40} @ {}",
+                        from.name(),
+                        departure_time.time
+                    )?;
+                    writeln!(f, "   Alight:  {:40} @ {}", to.name(), arrival_time.time)?;
                 }
                 Leg::Walk {
                     from,
@@ -197,15 +233,55 @@ impl std::fmt::Display for Plan {
                         .time
                         .as_minutes()
                         .saturating_sub(departure_time.time.as_minutes());
+
+                    let walk_label = match (from.is_bike_dock(), to.is_transit_station(), to.is_bike_dock()) {
+                        (true, true, _) => "Walk to Station",
+                        (_, _, true) => "Walk to Bike Dock",
+                        _ if i + 1 == self.legs.len() => "Walk to Destination",
+                        _ => "Walk",
+                    };
+
                     writeln!(
                         f,
-                        "Leg {}: [🚶 Walk ({:.2} mi, {} mins)]",
+                        "Leg {}: [🚶 {} ({:.2} mi, {} mins)]",
                         i + 1,
+                        walk_label,
                         distance_miles,
                         walk_mins
                     )?;
-                    writeln!(f, "   Start:   {:32} @ {}", from.name(), departure_time.time)?;
-                    writeln!(f, "   End:     {:32} @ {}", to.name(), arrival_time.time)?;
+                    writeln!(
+                        f,
+                        "   Start:   {:40} @ {}",
+                        from.name(),
+                        departure_time.time
+                    )?;
+                    writeln!(f, "   End:     {:40} @ {}", to.name(), arrival_time.time)?;
+                }
+                Leg::Bike {
+                    from,
+                    to,
+                    distance_miles,
+                    departure_time,
+                    arrival_time,
+                } => {
+                    let bike_mins = arrival_time
+                        .time
+                        .as_minutes()
+                        .saturating_sub(departure_time.time.as_minutes());
+                    writeln!(
+                        f,
+                        "Leg {}: [🚲 Bike ({:.2} mi, {} mins)]",
+                        i + 1,
+                        distance_miles,
+                        bike_mins
+                    )?;
+                    writeln!(
+                        f,
+                        "   Unlock:  {:40} @ {}",
+                        from.name(),
+                        departure_time.time
+                    )?;
+                    writeln!(f, "   Dock:    {:40} @ {}", to.name(), arrival_time.time)?;
                 }
             }
 
@@ -230,6 +306,12 @@ pub struct SearchState {
     pub path: Vec<Leg>,
 }
 
+impl SearchState {
+    pub fn last_leg(&self) -> Option<&Leg> {
+        self.path.last()
+    }
+}
+
 impl PartialEq for SearchState {
     fn eq(&self, other: &Self) -> bool {
         self.current_time == other.current_time
@@ -250,81 +332,191 @@ impl PartialOrd for SearchState {
     }
 }
 
-pub fn find_route(
-    transit: &TransitNetwork,
-    query: Query,
-) -> Option<Plan> {
-    let mut pq = BinaryHeap::new();
-    let mut best_times: HashMap<Location, DateTime> = HashMap::new();
+struct SearchContext<'a> {
+    transit: &'a TransitNetwork,
+    bike: &'a BikeNetwork,
+    query: &'a Query,
+    departure_time: DateTime,
+    pq: BinaryHeap<SearchState>,
+    best_times: HashMap<Location, DateTime>,
+}
 
-    let init_state = SearchState {
-        current_location: query.origin.clone(),
-        current_time: query.departure_time,
-        path: Vec::new(),
-    };
-    pq.push(init_state);
+impl<'a> SearchContext<'a> {
+    fn new(transit: &'a TransitNetwork, bike: &'a BikeNetwork, query: &'a Query) -> Self {
+        let departure_time = query.get_departure_time();
+        let mut pq = BinaryHeap::new();
+        let mut best_times = HashMap::new();
 
-    // Initial best times
-    best_times.insert(query.origin.clone(), query.departure_time);
-    let direct_walk_arr = query.departure_time + query.origin.walk_duration(&query.destination);
-    best_times.insert(query.destination.clone(), direct_walk_arr);
+        best_times.insert(query.origin.clone(), departure_time);
+        if bike.can_bike_between(&query.origin, &query.destination) {
+            let direct_walk = departure_time + query.origin.walk_duration(&query.destination);
+            best_times.insert(query.destination.clone(), direct_walk);
+        }
 
-    while let Some(state) = pq.pop() {
-        // 1) Destination reached
-        if state.current_location == query.destination {
-            return Some(Plan {
-                origin: query.origin,
-                destination: query.destination,
-                departure_time: query.departure_time,
-                arrival_time: state.current_time,
-                legs: merge_consecutive_transit_legs(state.path),
+        pq.push(SearchState {
+            current_location: query.origin.clone(),
+            current_time: departure_time,
+            path: Vec::new(),
+        });
+
+        Self {
+            transit,
+            bike,
+            query,
+            departure_time,
+            pq,
+            best_times,
+        }
+    }
+
+    fn try_step(
+        &mut self,
+        state: &SearchState,
+        next_location: Location,
+        arrival_time: DateTime,
+        leg: Leg,
+    ) {
+        let best = self
+            .best_times
+            .get(&next_location)
+            .copied()
+            .unwrap_or(DateTime {
+                date: self.departure_time.date.next_day(),
+                time: Time::MAX,
+            });
+
+        if arrival_time < best {
+            self.best_times.insert(next_location.clone(), arrival_time);
+            let mut new_path = state.path.clone();
+            new_path.push(leg);
+            self.pq.push(SearchState {
+                current_time: arrival_time,
+                current_location: next_location,
+                path: new_path,
             });
         }
+    }
 
-        // 2) Pruning
-        if let Some(&best) = best_times.get(&state.current_location)
-            && state.current_time > best
-        {
-            continue;
+    fn is_bike_dock(&self, location: &Location) -> bool {
+        match location {
+            Location::Station { id, .. } => self.bike.get_station(id).is_some(),
+            _ => false,
         }
+    }
 
-        // 3) Explore edges
-        // I - Walk to nearby stations
-        let start_stations =
-            transit.stations.find_nearby_stations(&state.current_location.get_coordinates(), 1.0);
-        for (station, station_dist_miles) in start_stations {
-            let mut new_path = state.path.clone();
+    // -------------------------------------------------------------------------
+    // Edge Exploration Helpers
+    // -------------------------------------------------------------------------
+
+    fn explore_walk_to_transit(&mut self, state: &SearchState) {
+        if matches!(state.last_leg(), Some(Leg::Walk { .. })) {
+            return;
+        }
+        let stations = self
+            .transit
+            .stations
+            .find_nearby_stations(&state.current_location.get_coordinates(), 1.0);
+
+        for (station, dist_miles) in stations {
+            if station == state.current_location {
+                continue;
+            }
+            if !self.bike.can_bike_between(&state.current_location, &station) {
+                continue;
+            }
             let arrival_time = state.current_time + state.current_location.walk_duration(&station);
-
-            if arrival_time < best_times.get(&station).copied().unwrap_or(DateTime {
-                date: query.departure_time.date.next_day(),
-                time: Time::MAX,
-            }) {
-                best_times.insert(station.clone(), arrival_time);
-
-                new_path.push(Leg::Walk {
+            self.try_step(
+                state,
+                station.clone(),
+                arrival_time,
+                Leg::Walk {
                     from: state.current_location.clone(),
-                    to: station.clone(),
-                    distance_miles: station_dist_miles,
+                    to: station,
+                    distance_miles: dist_miles,
                     departure_time: state.current_time,
                     arrival_time,
-                });
-
-                pq.push(SearchState {
-                    current_time: arrival_time,
-                    current_location: station.clone(),
-                    path: new_path,
-                });
-            }
+                },
+            );
         }
+    }
 
-        // II - Transit: Station to station (day-aware + 2-min boarding buffer)
-        let active_services = transit.schedule.active_services_for_date(&state.current_time.date);
+    fn explore_walk_to_bike_docks(&mut self, state: &SearchState) {
+        if matches!(
+            state.last_leg(),
+            Some(Leg::Walk { .. }) | Some(Leg::Bike { .. })
+        ) {
+            return;
+        }
+        let docks = self
+            .bike
+            .find_nearby_stations(&state.current_location.get_coordinates(), 0.5);
 
-        if let Some(edges) = transit.graph.adjacency_list.get(&state.current_location) {
+        for (dock, dist_miles) in docks {
+            if dock == state.current_location {
+                continue;
+            }
+            if !self.bike.can_bike_between(&state.current_location, &dock) {
+                continue;
+            }
+            let arrival_time = state.current_time + state.current_location.walk_duration(&dock);
+            self.try_step(
+                state,
+                dock.clone(),
+                arrival_time,
+                Leg::Walk {
+                    from: state.current_location.clone(),
+                    to: dock,
+                    distance_miles: dist_miles,
+                    departure_time: state.current_time,
+                    arrival_time,
+                },
+            );
+        }
+    }
+
+    fn explore_bike_rides(&mut self, state: &SearchState) {
+        let candidate_docks = self
+            .bike
+            .find_nearby_stations(&state.current_location.get_coordinates(), 3.0);
+
+        for (dock, dist_miles) in candidate_docks {
+            if dock == state.current_location {
+                continue;
+            }
+            if !self.bike.can_bike_between(&state.current_location, &dock) {
+                continue;
+            }
+            let bike_duration = state.current_location.bike_duration(&dock) + Time::from_minutes(1);
+            let arrival_time = state.current_time + bike_duration;
+            self.try_step(
+                state,
+                dock.clone(),
+                arrival_time,
+                Leg::Bike {
+                    from: state.current_location.clone(),
+                    to: dock,
+                    distance_miles: dist_miles,
+                    departure_time: state.current_time,
+                    arrival_time,
+                },
+            );
+        }
+    }
+
+    fn explore_transit(&mut self, state: &SearchState) {
+        let active_services = self
+            .transit
+            .schedule
+            .active_services_for_date(&state.current_time.date);
+
+        if let Some(edges) = self
+            .transit
+            .graph
+            .adjacency_list
+            .get(&state.current_location)
+        {
             for edge in edges {
-                // If we are already on this train, no boarding buffer needed
-                let is_staying_on_train = match state.path.last() {
+                let is_staying_on_train = match state.last_leg() {
                     Some(Leg::Transit { trip_id, .. }) => {
                         edge.departures.iter().any(|d| &d.trip_id == trip_id)
                     }
@@ -332,7 +524,9 @@ pub fn find_route(
                 };
 
                 let buffer = match &state.current_location {
-                    Location::Station { id, .. } => transit.stations
+                    Location::Station { id, .. } => self
+                        .transit
+                        .stations
                         .get_station(id)
                         .map_or(Time::from_minutes(2), |s| s.boarding_buffer()),
                     _ => Time::from_minutes(2),
@@ -349,53 +543,83 @@ pub fn find_route(
                         DateTime::new(state.current_time.date, departure.departure_time);
                     let arrival_time = dep_datetime + departure.travel_time;
 
-                    if arrival_time < best_times.get(&edge.to).copied().unwrap_or(DateTime {
-                        date: query.departure_time.date.next_day(),
-                        time: Time::MAX,
-                    }) {
-                        best_times.insert(edge.to.clone(), arrival_time);
-
-                        let mut new_path = state.path.clone();
-                        new_path.push(Leg::Transit {
+                    self.try_step(
+                        state,
+                        edge.to.clone(),
+                        arrival_time,
+                        Leg::Transit {
                             from: state.current_location.clone(),
                             to: edge.to.clone(),
                             trip_id: departure.trip_id.clone(),
                             departure_time: dep_datetime,
                             arrival_time,
                             stops_count: 1,
-                        });
-
-                        pq.push(SearchState {
-                            current_time: arrival_time,
-                            current_location: edge.to.clone(),
-                            path: new_path,
-                        });
-                    }
+                        },
+                    );
                 }
             }
         }
+    }
 
-        // III - Walk to final destination
-        let mut new_path = state.path.clone();
-        let arrival_time =
-            state.current_time + state.current_location.walk_duration(&query.destination);
-
-        if arrival_time < best_times.get(&query.destination).copied().unwrap() {
-            best_times.insert(query.destination.clone(), arrival_time);
-            new_path.push(Leg::Walk {
+    fn explore_walk_to_destination(&mut self, state: &SearchState) {
+        if !self.bike.can_bike_between(&state.current_location, &self.query.destination) {
+            return;
+        }
+        let arrival_time = state.current_time
+            + state
+                .current_location
+                .walk_duration(&self.query.destination);
+        self.try_step(
+            state,
+            self.query.destination.clone(),
+            arrival_time,
+            Leg::Walk {
                 from: state.current_location.clone(),
-                to: query.destination.clone(),
-                distance_miles: state.current_location.walk_miles(&query.destination),
+                to: self.query.destination.clone(),
+                distance_miles: state.current_location.walk_miles(&self.query.destination),
                 departure_time: state.current_time,
                 arrival_time,
-            });
+            },
+        );
+    }
+}
 
-            pq.push(SearchState {
-                current_time: arrival_time,
-                current_location: query.destination.clone(),
-                path: new_path,
+pub fn find_route(transit: &TransitNetwork, bike: &BikeNetwork, query: Query) -> Option<Plan> {
+    let mut ctx = SearchContext::new(transit, bike, &query);
+
+    while let Some(state) = ctx.pq.pop() {
+        // 1) Destination reached
+        if state.current_location == query.destination {
+            let departure_time = ctx.departure_time;
+            return Some(Plan {
+                origin: query.origin.clone(),
+                destination: query.destination.clone(),
+                departure_time,
+                arrival_time: state.current_time,
+                legs: merge_consecutive_transit_legs(state.path),
             });
         }
+
+        // 2) Pruning
+        if let Some(&best) = ctx.best_times.get(&state.current_location)
+            && state.current_time > best
+        {
+            continue;
+        }
+
+        // 3) Explore edges with state-based dispatch
+        if ctx.is_bike_dock(&state.current_location)
+            && matches!(state.last_leg(), Some(Leg::Walk { .. }))
+        {
+            // Just walked to a bike dock -> unlock & ride
+            ctx.explore_bike_rides(&state);
+        } else {
+            ctx.explore_transit(&state);
+            ctx.explore_walk_to_transit(&state);
+            ctx.explore_walk_to_bike_docks(&state);
+        }
+
+        ctx.explore_walk_to_destination(&state);
     }
 
     None
