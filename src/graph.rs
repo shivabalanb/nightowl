@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use crate::{
     transit_network::{Schedule, TransitStationDirectory},
-    util::{Location, Time},
+    util::{Location, ModeSet, Time, TransitMode},
 };
 
 #[derive(Debug, Deserialize)]
@@ -25,6 +25,7 @@ struct StopTimeRow {
 pub struct Departure {
     pub trip_id: String,
     pub service_id: String,
+    pub mode: TransitMode,
     pub departure_time: Time,
     pub travel_time: Time,
 }
@@ -40,10 +41,15 @@ impl Edge {
         &self,
         current_time: Time,
         active_services: &HashSet<String>,
+        modes: &ModeSet,
     ) -> Option<&Departure> {
         self.departures
             .iter()
-            .filter(|d| d.departure_time >= current_time && active_services.contains(&d.service_id))
+            .filter(|d| {
+                d.departure_time >= current_time
+                    && modes.allows(d.mode)
+                    && active_services.contains(&d.service_id)
+            })
             .min_by_key(|d| d.departure_time)
     }
 }
@@ -110,9 +116,20 @@ impl Graph {
                 };
 
                 let travel_time = to_arr.saturating_sub(from_dep);
+                let mode = if from_id.starts_with("path:") {
+                    TransitMode::Path
+                } else if from_id.starts_with("mta:") {
+                    TransitMode::Mta
+                } else if from_id.starts_with("hblr:") {
+                    TransitMode::Hblr
+                } else {
+                    TransitMode::Path
+                };
+
                 let departure = Departure {
                     trip_id: trip_id.clone(),
                     service_id: service_id.clone(),
+                    mode,
                     departure_time: from_dep,
                     travel_time,
                 };

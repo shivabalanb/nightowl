@@ -2,11 +2,26 @@ use std::{collections::HashMap, error::Error, fs::File, path::Path};
 
 use serde::Deserialize;
 
-use crate::util::{Coordinates, Location};
+use crate::{
+    realtime::{BikeStationStatus, fetch_citibike_status},
+    util::{Coordinates, Location},
+};
+
+// ============================================================================
+// Real-Time Citi Bike GBFS Endpoints (Reference)
+// ============================================================================
+//
+// 1. Static Station Info:
+//    https://gbfs.citibikenyc.com/gbfs/en/station_information.json
+//
+// 2. Live Station Status (Bikes/Docks Available):
+//    https://gbfs.citibikenyc.com/gbfs/en/station_status.json
+// ============================================================================
 
 #[derive(Debug, Default)]
 pub struct BikeNetwork {
     pub stations: HashMap<String, BikeStation>,
+    pub status: HashMap<String, BikeStationStatus>,
 }
 
 impl BikeNetwork {
@@ -100,6 +115,38 @@ impl BikeNetwork {
         };
 
         get_is_nj(from) == get_is_nj(to)
+    }
+
+    /// Checks if a dock has bikes available to unlock (defaults to true if offline / no status loaded)
+    pub fn can_unlock(&self, station_id: &str) -> bool {
+        if self.status.is_empty() {
+            return true;
+        }
+        let clean_id = station_id.strip_prefix("citibike:").unwrap_or(station_id);
+        self.status
+            .get(station_id)
+            .or_else(|| self.status.get(clean_id))
+            .map_or(true, |s| s.can_unlock())
+    }
+
+    /// Checks if a dock has slots available to return a bike (defaults to true if offline / no status loaded)
+    pub fn can_dock(&self, station_id: &str) -> bool {
+        if self.status.is_empty() {
+            return true;
+        }
+        let clean_id = station_id.strip_prefix("citibike:").unwrap_or(station_id);
+        self.status
+            .get(station_id)
+            .or_else(|| self.status.get(clean_id))
+            .map_or(true, |s| s.can_dock())
+    }
+
+    /// Fetches live station status from Citi Bike GBFS endpoint
+    pub fn refresh_status(&mut self) -> Result<usize, Box<dyn Error>> {
+        let live_status = fetch_citibike_status()?;
+        let count = live_status.len();
+        self.status = live_status;
+        Ok(count)
     }
 }
 

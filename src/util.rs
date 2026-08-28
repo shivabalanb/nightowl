@@ -372,11 +372,93 @@ impl Location {
                     format!("{} (PATH)", name)
                 } else if id.starts_with("hblr:") {
                     format!("{} (HBLR)", name)
+                } else if id.starts_with("mta:") {
+                    format!("{} (MTA Subway)", name)
                 } else {
                     name.clone()
                 }
             }
             Location::Point(coords) => format!("Point ({:.4}, {:.4})", coords.lat, coords.lon),
         }
+    }
+}
+
+// ============================================================================
+// Transportation Modes & Filter Sets
+// ============================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TransitMode {
+    Walk,
+    Bike,
+    Path,
+    Mta,
+    Hblr,
+}
+
+impl std::fmt::Display for TransitMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TransitMode::Walk => write!(f, "walk"),
+            TransitMode::Bike => write!(f, "bike"),
+            TransitMode::Path => write!(f, "path"),
+            TransitMode::Mta => write!(f, "mta"),
+            TransitMode::Hblr => write!(f, "hblr"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModeSet {
+    allowed: std::collections::HashSet<TransitMode>,
+}
+
+impl Default for ModeSet {
+    fn default() -> Self {
+        Self::all()
+    }
+}
+
+impl ModeSet {
+    pub fn all() -> Self {
+        let mut allowed = std::collections::HashSet::new();
+        allowed.insert(TransitMode::Walk);
+        allowed.insert(TransitMode::Bike);
+        allowed.insert(TransitMode::Path);
+        allowed.insert(TransitMode::Mta);
+        allowed.insert(TransitMode::Hblr);
+        Self { allowed }
+    }
+
+    pub fn from_modes(modes: &[TransitMode]) -> Self {
+        let mut allowed = std::collections::HashSet::new();
+        for m in modes {
+            allowed.insert(*m);
+        }
+        allowed.insert(TransitMode::Walk);
+        Self { allowed }
+    }
+
+    pub fn allows(&self, mode: TransitMode) -> bool {
+        self.allowed.contains(&mode)
+    }
+
+    pub fn enable(&mut self, mode: TransitMode) {
+        self.allowed.insert(mode);
+    }
+
+    pub fn disable(&mut self, mode: TransitMode) {
+        self.allowed.remove(&mode);
+    }
+
+    pub fn active_modes_string(&self) -> String {
+        let mut list = Vec::new();
+        for mode in &[TransitMode::Walk, TransitMode::Bike, TransitMode::Path, TransitMode::Mta, TransitMode::Hblr] {
+            if self.allows(*mode) {
+                list.push(mode.to_string());
+            }
+        }
+        list.join(", ")
     }
 }

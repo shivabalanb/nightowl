@@ -1,6 +1,6 @@
 ## NightOwl: Navigation Compiler 
 
-This project aims to solve the simple question: what's the most efficient way to get from my home to work across PATH, CitiBike, Hudson-Bergen Light Rail, and walking.
+NightOwl is a multi-modal, time-dependent urban navigation engine written in Rust that compiles schedules and live telemetry across PATH Rail, MTA Subway, Hudson-Bergen Light Rail (HBLR), and Citi Bike.
 
 ## System Architecture
 
@@ -8,138 +8,132 @@ This diagram visualizes how raw transit schedules and live streams are compiled 
 
 ```mermaid
 graph LR
-    subgraph External ["External Sources"]
-        PATH["PATH Rail (GTFS)"]
-        CB["CitiBike (GBFS)"]
-        HBLR["Light Rail (GTFS)"]
+    subgraph External ["Live & Static Feeds"]
+        PATH["PATH Rail (GTFS + Live RidePATH)"]
+        CB["Citi Bike (GBFS Live Station Status)"]
+        MTA["MTA Subway (GTFS Timetable)"]
+        HBLR["NJ Transit / HBLR (GTFS API)"]
     end
 
     subgraph Backend ["Backend (Rust)"]
-        ING["Ingestion & Compiler"]
-        REDIS[("Redis Cache")]
-        GRAPH["In-Memory Graph"]
-        ROUTE["Dijkstra Router"]
+        ING["Ingestion & Live Feeds"]
+        GRAPH["In-Memory Multi-Modal Graph"]
+        FILTER["ModeSet Filter (CLI / API)"]
+        ROUTE["Time-Dependent Dijkstra Router"]
         
-        ING <--> REDIS
         ING --> GRAPH
-        ROUTE <--> GRAPH
+        GRAPH --> ROUTE
+        FILTER --> ROUTE
     end
 
-    subgraph Client ["Client (Next.js)"]
-        UI["UI & Map Display"]
+    subgraph Client ["Client / CLI"]
+        CLI["CLI Tool (nightowl)"]
+        UI["Web UI & Map Visualizer"]
     end
 
-    PATH & CB & HBLR --> ING
+    PATH & CB & MTA & HBLR --> ING
+    CLI <--> ROUTE
     UI <--> ROUTE
 ```
 
 ## Project Roadmap
 
-Here is the step-by-step implementation plan for **NightOwl**:
-
 ### Stage 1: Core Engine & Spatial Primitives
 - [x] Set up Rust workspace and Dijkstra pathfinding primitives
 - [x] Implement Manhattan grid distance ($L_1$ norm) and urban walking pace (2.5 mph)
 - [x] Formulate initial time-dependent search states
-```
-Edge: Newport PATH <-> Grove St PATH (0.6711 miles)
-Edge: Grove St PATH <-> Exchange Place PATH (0.5788 miles)
-Edge: Newport PATH <-> Exchange Place PATH (0.7366 miles)
-
-SUCCESS: Shortest path distance from Newport PATH to Exchange Place PATH is 0.7366 miles!
-
---- Testing Edge Weight At Specific Departure Times ---
-Arriving at 8:00 AM (480 mins): 1.53 minutes total cost
-Arriving at 8:10 AM (490 mins): 21.53 minutes total cost
-Arriving at 9:00 AM (540 mins): inf minutes total cost
--------------------------------------------------------
-```
 
 ### Stage 2: PATH Rail & Multi-Modal Routing Engine
 - [x] Parse PATH GTFS static feeds (`stops.txt`, `stop_times.txt`)
 - [x] Construct self-contained `Location` architecture (`Station` vs `Point`)
 - [x] Implement multi-modal Dijkstra search: `Walk` $\rightarrow$ `Transit` $\rightarrow$ `Walk`
 - [x] Verify coordinate-to-coordinate routing output against real-world Google Maps queries
-```
-============================================================
-  ROUTE: Point (40.7300, -74.0346) ➔ Point (40.7406, -73.9858)
-  Departure:      10:22 EST
-  Total Duration: 31 mins
-============================================================
-Leg 1: [🚶 Walk (0.21 mi, 6 mins)]
-   Start:   Point (40.7300, -74.0346)      @ 10:22 EST
-   End:     Newport                        @ 10:28 EST
-------------------------------------------------------------
-Leg 2: [🚆 Transit - Trip ID: t_6004238_b_none_tn_2]
-   Get On:  Newport                        @ 10:28 EST
-   Get Off: Christopher Street             @ 10:36 EST
-------------------------------------------------------------
-Leg 3: [🚆 Transit - Trip ID: t_6004238_b_none_tn_2]
-   Get On:  Christopher Street             @ 10:36 EST
-   Get Off: 9th Street                     @ 10:37 EST
-------------------------------------------------------------
-Leg 4: [🚆 Transit - Trip ID: t_6004238_b_none_tn_2]
-   Get On:  9th Street                     @ 10:37 EST
-   Get Off: 14th Street                    @ 10:39 EST
-------------------------------------------------------------
-Leg 5: [🚆 Transit - Trip ID: t_6004238_b_none_tn_2]
-   Get On:  14th Street                    @ 10:39 EST
-   Get Off: 23rd Street                    @ 10:40 EST
-------------------------------------------------------------
-Leg 6: [🚶 Walk (0.52 mi, 13 mins)]
-   Start:   23rd Street                    @ 10:40 EST
-   End:     Point (40.7406, -73.9858)      @ 10:53 EST
-============================================================
-```
 
-### Stage 3: Micro-Mobility & Real-Time Streams (CitiBike GBFS & Delays)
-- [ ] Ingest CitiBike GBFS live feeds (real-time dock availability & bike locations)
-- [x] Add `Leg::Bike` modality with dock pick-up/drop-off constraints
-- [ ] Incorporate live delay feeds to adjust active transit edges dynamically
-```====================================================================
-  ROUTE: Point (40.7220, -74.0369) ➔ Point (40.7172, -73.9864)
-  Date:           2026-08-17 (Monday)
-  Departure:      19:15 EST
-  Arrival:        19:51 EST
-  Total Duration: 36 mins
+### Stage 3: Micro-Mobility & Real-Time Streams (Citi Bike GBFS & Live Feeds)
+- [x] Ingest Citi Bike GBFS live feeds (`station_status.json` with live available bikes & open dock slots)
+- [x] Enforce real-time unlock/dock availability constraints in pathfinding (`can_unlock`, `can_dock`)
+- [x] Live PATH real-time train departure integration (RidePATH feed with seconds-to-arrival overlay)
+- [x] Authenticated NJ Transit Developer Token API manager with cached session tokens
+
+### Stage 4: Multi-Agency Expansion (MTA Subway & Hudson-Bergen Light Rail)
+- [x] Ingest full NYC MTA Subway static GTFS schedule (490+ stations across NYC)
+- [x] Ingest Hudson-Bergen Light Rail (HBLR) & NJ Transit Rail via GTFS API with `calendar_dates.txt` support
+- [x] Support cross-agency underground transfers (e.g. PATH 33rd St $\leftrightarrow$ MTA 34th St-Herald Sq)
+- [x] Granular transportation mode toggles (`TransitMode` / `ModeSet`) with zero-cost Dijkstra filtering
+- [x] CLI flags for selective modal routing (`--no-bike`, `--no-mta`, `--no-path`, `--no-hblr`, `--modes ...`)
+
+```text
+Loading networks...
+Networks ready: 681 transit stations (674 graph nodes, 64 services), 2508 Citi Bike docks
+Active modes:   walk, bike, path, mta, hblr
+Real-time sync:
+  [OK] Citi Bike: synced 2508 live docks
+  [OK] PATH: synced 31 live departures
+  [OK] NJ Transit: authenticated user 'shivabalanb'
 ====================================================================
-Leg 1: [🚶 Walk to Bike Dock (0.18 mi, 4 mins)]
-   Start:   Point (40.7220, -74.0369)                @ 19:15 EST
-   End:     Washington St & Morgan St (Citi Bike)    @ 19:19 EST
+ROUTE: Point (40.7220, -74.0369) -> Point (40.7172, -73.9864)
+Date:  2026-08-28 (Friday) | Dep: 00:47 EST | Arr: 01:18 EST | Duration: 31 mins
+====================================================================
+Leg 1: [Walk to Bike Dock (0.17 mi, 5 mins)]
+  Start:   Point (40.7220, -74.0369)                @ 00:47 EST
+  End:     Washington St (Citi Bike)                @ 00:52 EST
 --------------------------------------------------------------------
-Leg 2: [🚲 Bike (0.25 mi, 3 mins)]
-   Unlock:  Washington St & Morgan St (Citi Bike)    @ 19:19 EST
-   Dock:    Exchange Pl (Citi Bike)                  @ 19:22 EST
+Leg 2: [Bike (0.22 mi, 3 mins)]
+  Unlock:  Washington St (Citi Bike)                @ 00:52 EST
+  Dock:    Newport PATH (Citi Bike)                 @ 00:55 EST
 --------------------------------------------------------------------
-Leg 3: [🚶 Walk to Station (0.11 mi, 3 mins)]
-   Start:   Exchange Pl (Citi Bike)                  @ 19:22 EST
-   End:     Exchange Place (PATH)                    @ 19:25 EST
+Leg 3: [Walk to Station (0.02 mi, 0 mins)]
+  Start:   Newport PATH (Citi Bike)                 @ 00:55 EST
+  End:     Newport (PATH)                           @ 00:55 EST
 --------------------------------------------------------------------
-   ⏳ Wait 6 mins at Exchange Place (PATH)
+  Wait 2 mins at Newport (PATH)
 --------------------------------------------------------------------
-Leg 4: [🚆 Transit (t_6039055_b_84435_tn_37) - 5 mins, 1 stop]
-   Board:   Exchange Place (PATH)                    @ 19:31 EST
-   Alight:  World Trade Center (PATH)                @ 19:36 EST
+Leg 4: [Transit (live_NEW_33S) - 5 mins, 1 stop]
+  Board:   Newport (PATH)                           @ 00:57 EST
+  Alight:  33rd Street (PATH)                       @ 01:02 EST
 --------------------------------------------------------------------
-Leg 5: [🚶 Walk to Bike Dock (0.04 mi, 1 mins)]
-   Start:   World Trade Center (PATH)                @ 19:36 EST
-   End:     Vesey St & Greenwich St (Citi Bike)      @ 19:37 EST
+Leg 5: [Walk (0.05 mi, 1 mins)]
+  Start:   33rd Street (PATH)                       @ 01:02 EST
+  End:     34 St-Herald Sq (MTA Subway)             @ 01:03 EST
 --------------------------------------------------------------------
-Leg 6: [🚲 Bike (1.28 mi, 11 mins)]
-   Unlock:  Vesey St & Greenwich St (Citi Bike)      @ 19:37 EST
-   Dock:    Clinton St & Grand St (Citi Bike)        @ 19:48 EST
+  Wait 2 mins at 34 St-Herald Sq (MTA Subway)
 --------------------------------------------------------------------
-Leg 7: [🚶 Walk to Destination (0.13 mi, 3 mins)]
-   Start:   Clinton St & Grand St (Citi Bike)        @ 19:48 EST
-   End:     Point (40.7172, -73.9864)                @ 19:51 EST
+Leg 6: [Transit (BSP26GEN-D085-Weekday-00_002550_D..S05R) - 7 mins, 3 stops]
+  Board:   34 St-Herald Sq (MTA Subway)             @ 01:05 EST
+  Alight:  Grand St (MTA Subway)                    @ 01:12 EST
+--------------------------------------------------------------------
+Leg 7: [Walk to Bike Dock (0.04 mi, 1 mins)]
+  Start:   Grand St (MTA Subway)                    @ 01:12 EST
+  End:     Forsyth St & Grand St (Citi Bike)        @ 01:13 EST
+--------------------------------------------------------------------
+Leg 8: [Bike (0.27 mi, 3 mins)]
+  Unlock:  Forsyth St & Grand St (Citi Bike)        @ 01:13 EST
+  Dock:    Norfolk St & Broome St (Citi Bike)       @ 01:16 EST
+--------------------------------------------------------------------
+Leg 9: [Walk to Destination (0.08 mi, 2 mins)]
+  Start:   Norfolk St & Broome St (Citi Bike)       @ 01:16 EST
+  End:     Point (40.7172, -73.9864)                @ 01:18 EST
 ====================================================================
 ```
-### Stage 4: Light Rail Expansion (Hudson-Bergen Light Rail)
-- [ ] Ingest Hudson-Bergen Light Rail (HBLR) GTFS static schedules
-- [ ] Support PATH $\leftrightarrow$ Light Rail transfer stations (Exchange Place, Newport, Hoboken)
-- [ ] Incorporate transfer penalty buffers for switching transit lines
 
 ### Stage 5: Web UI & Delivery Pipeline (Next.js & Map Visualizer)
 - [ ] Build high-performance Rust web API endpoint (`GET /route?origin=...&destination=...`)
 - [ ] Create Next.js interactive map frontend with Leaflet.js / Mapbox
 - [ ] Render multi-modal route step polylines on the map
+
+## CLI Usage
+
+```bash
+# Default: run routing with all transportation modes
+cargo run --release
+
+# Disable specific modes:
+cargo run --release -- --no-bike
+cargo run --release -- --no-mta
+cargo run --release -- --no-path
+cargo run --release -- --no-hblr
+
+# Restrict to specific modes:
+cargo run --release -- --modes walk,path,mta
+```
+ multi-modal route step polylines on the map

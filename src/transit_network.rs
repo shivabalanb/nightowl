@@ -9,9 +9,44 @@ use std::{
 use serde::Deserialize;
 
 use crate::{
-    graph::Graph,
-    util::{Coordinates, Date, DayOfWeek, Location, Time},
+    graph::{Departure, Edge, Graph},
+    util::{Coordinates, Date, DateTime, DayOfWeek, Location, Time, TransitMode},
 };
+
+// ============================================================================
+// Real-Time Transit Feed Endpoints (Reference)
+// ============================================================================
+//
+// 1. PATH (Port Authority of NY & NJ):
+//    - Official RidePATH JSON (live countdowns):
+//      https://www.panynj.gov/bin/portauthority/ridepath.json
+//    - Community GTFS-RT Protobuf feed:
+//      https://path.transitdata.nyc/gtfsrt
+//
+// 2. MTA NYC Subway (GTFS-RT Protobuf Feeds):
+//    - Lines 1, 2, 3, 4, 5, 6, S:
+//      https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs
+//    - Lines A, C, E:
+//      https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace
+//    - Lines B, D, F, M:
+//      https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm
+//    - Lines G:
+//      https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g
+//    - Lines J, Z:
+//      https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz
+//    - Lines N, Q, R, W:
+//      https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-nqrw
+//    - Lines L:
+//      https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-l
+//    - Lines 7:
+//      https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-7
+//
+// 3. NJ Transit / HBLR (Hudson-Bergen Light Rail):
+//    - NJ Transit Developer Portal (Registration required for GTFS-RT):
+//      https://developer.njtransit.com/
+//    - Live DepartureVision:
+//      https://dv.njtransit.com/
+// ============================================================================
 
 // ============================================================================
 // Raw GTFS CSV Structs
@@ -248,9 +283,17 @@ impl CalendarService {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CalendarDateRaw {
+    pub service_id: String,
+    pub date: String,
+    pub exception_type: u8,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Schedule {
     pub services: HashMap<String, CalendarService>,
+    pub calendar_dates: HashMap<Date, HashSet<String>>,
     pub trip_to_service: HashMap<String, String>,
 }
 
@@ -260,11 +303,32 @@ impl Schedule {
     }
 
     pub fn load_calendar<P: AsRef<Path>>(&mut self, file_path: P) -> Result<(), Box<dyn Error>> {
-        let mut rdr = csv::Reader::from_path(file_path)?;
+        let p = file_path.as_ref();
+        if !p.exists() {
+            return Ok(());
+        }
+        let mut rdr = csv::Reader::from_path(p)?;
         for result in rdr.deserialize() {
             let raw: CalendarRaw = result?;
             if let Ok(service) = CalendarService::try_from(raw) {
                 self.services.insert(service.service_id.clone(), service);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn load_calendar_dates<P: AsRef<Path>>(&mut self, file_path: P) -> Result<(), Box<dyn Error>> {
+        let p = file_path.as_ref();
+        if !p.exists() {
+            return Ok(());
+        }
+        let mut rdr = csv::Reader::from_path(p)?;
+        for result in rdr.deserialize() {
+            let raw: CalendarDateRaw = result?;
+            if let Ok(date) = Date::from_str(&raw.date) {
+                if raw.exception_type == 1 {
+                    self.calendar_dates.entry(date).or_default().insert(raw.service_id);
+                }
             }
         }
         Ok(())
@@ -290,11 +354,16 @@ impl Schedule {
     }
 
     pub fn active_services_for_date(&self, date: &Date) -> HashSet<String> {
-        self.services
+        let mut active: HashSet<String> = self.services
             .values()
             .filter(|s| s.is_active_on(date))
             .map(|s| s.service_id.clone())
-            .collect()
+            .collect();
+        if let Some(date_services) = self.calendar_dates.get(date) {
+            active.extend(date_services.iter().cloned());
+        }
+        active.insert("realtime".to_string());
+        active
     }
 
     pub fn get_service_id(&self, trip_id: &str) -> Option<&str> {
@@ -330,7 +399,7 @@ impl TransitNetwork {
         }
     }
 
-    /// Loads and merges GTFS data (stops, calendar, trips, stop_times)
+    /// Loads and merges GTFS data (stops, calendar/calendar_dates, trips, stop_times)
     pub fn load_gtfs<P: AsRef<Path>>(
         &mut self,
         dir: P,
@@ -339,11 +408,18 @@ impl TransitNetwork {
         let dir_path = dir.as_ref();
         let stops_path = dir_path.join("stops.txt");
         let calendar_path = dir_path.join("calendar.txt");
+        let calendar_dates_path = dir_path.join("calendar_dates.txt");
         let trips_path = dir_path.join("trips.txt");
         let stop_times_path = dir_path.join("stop_times.txt");
 
         self.stations.load_from_gtfs(stops_path, agency_prefix)?;
-        self.schedule.load_from_gtfs(calendar_path, trips_path)?;
+        if calendar_path.exists() {
+            self.schedule.load_calendar(calendar_path)?;
+        }
+        if calendar_dates_path.exists() {
+            self.schedule.load_calendar_dates(calendar_dates_path)?;
+        }
+        self.schedule.load_trips(trips_path)?;
 
         let feed_graph = Graph::from_gtfs_file(stop_times_path, &self.stations, &self.schedule)?;
         for (location, edges) in feed_graph.adjacency_list {
@@ -374,5 +450,80 @@ impl TransitNetwork {
         max_distance_miles: f64,
     ) -> Vec<(Location, f64)> {
         self.stations.find_nearby_stations(coords, max_distance_miles)
+    }
+
+    /// Overlays live real-time PATH departures onto the transit graph
+    pub fn refresh_realtime(&mut self, current_time: &DateTime) -> Result<usize, Box<dyn Error>> {
+        let live_departures = crate::realtime::fetch_path_realtime()?;
+        let count = live_departures.len();
+
+        for live in live_departures {
+            let from_loc = match self
+                .stations
+                .stations
+                .values()
+                .find(|s| s.name.to_lowercase().contains(&live.station_name.to_lowercase()))
+            {
+                Some(s) => s.to_location(),
+                None => continue,
+            };
+
+            let dest_name = match live.destination_code.to_uppercase().as_str() {
+                "WTC" => "World Trade Center",
+                "33S" | "33RD" => "33rd Street",
+                "HOB" => "Hoboken",
+                "JSQ" => "Journal Square",
+                "NWK" => "Newark",
+                "EXP" => "Exchange Place",
+                "NEW" => "Newport",
+                "HAR" => "Harrison",
+                "GRV" => "Grove Street",
+                "CHR" => "Christopher Street",
+                "14S" => "14th Street",
+                "23S" => "23rd Street",
+                "9ST" => "9th Street",
+                _ => continue,
+            };
+
+            let to_loc = match self
+                .stations
+                .stations
+                .values()
+                .find(|s| s.name.to_lowercase().contains(&dest_name.to_lowercase()))
+            {
+                Some(s) => s.to_location(),
+                None => continue,
+            };
+
+            let dep_mins = current_time.time.as_minutes() + (live.seconds_to_arrival as u32 / 60);
+            let dep_time = Time::from_minutes(dep_mins);
+
+            let edges = self.graph.adjacency_list.entry(from_loc.clone()).or_default();
+            let travel_time = edges
+                .iter()
+                .find(|e| e.to == to_loc)
+                .and_then(|e| e.departures.first().map(|d| d.travel_time))
+                .unwrap_or(Time::from_minutes(5));
+
+            let departure = Departure {
+                trip_id: format!("live_{}_{}", live.station_code, live.destination_code),
+                service_id: "realtime".to_string(),
+                mode: TransitMode::Path,
+                departure_time: dep_time,
+                travel_time,
+            };
+
+            if let Some(edge) = edges.iter_mut().find(|e| e.to == to_loc) {
+                edge.departures.push(departure);
+                edge.departures.sort_by_key(|d| d.departure_time);
+            } else {
+                edges.push(Edge {
+                    to: to_loc,
+                    departures: vec![departure],
+                });
+            }
+        }
+
+        Ok(count)
     }
 }

@@ -6,7 +6,7 @@ use std::{
 use crate::{
     bike_network::BikeNetwork,
     transit_network::TransitNetwork,
-    util::{DateTime, Location, Time},
+    util::{DateTime, Location, ModeSet, Time, TransitMode},
 };
 
 #[derive(Debug, Clone)]
@@ -14,6 +14,7 @@ pub struct Query {
     pub origin: Location,
     pub destination: Location,
     pub departure_time: Option<DateTime>,
+    pub modes: ModeSet,
 }
 
 impl Query {
@@ -22,11 +23,17 @@ impl Query {
             origin,
             destination,
             departure_time: None,
+            modes: ModeSet::all(),
         }
     }
 
     pub fn with_departure_time(mut self, departure_time: DateTime) -> Self {
         self.departure_time = Some(departure_time);
+        self
+    }
+
+    pub fn with_modes(mut self, modes: ModeSet) -> Self {
+        self.modes = modes;
         self
     }
 
@@ -155,19 +162,19 @@ impl std::fmt::Display for Plan {
         )?;
         writeln!(
             f,
-            "  ROUTE: {} ➔ {}",
+            "ROUTE: {} -> {}",
             self.origin.name(),
             self.destination.name()
         )?;
         writeln!(
             f,
-            "  Date:           {} ({})",
+            "Date:  {} ({}) | Dep: {} | Arr: {} | Duration: {} mins",
             self.departure_time.date,
-            self.departure_time.date.day_of_week()
+            self.departure_time.date.day_of_week(),
+            self.departure_time.time,
+            self.arrival_time.time,
+            total_mins
         )?;
-        writeln!(f, "  Departure:      {}", self.departure_time.time)?;
-        writeln!(f, "  Arrival:        {}", self.arrival_time.time)?;
-        writeln!(f, "  Total Duration: {} mins", total_mins)?;
         writeln!(
             f,
             "===================================================================="
@@ -180,7 +187,7 @@ impl std::fmt::Display for Plan {
                 let wait_mins = curr_dep.saturating_sub(prev_arr);
 
                 if wait_mins > 0 {
-                    writeln!(f, "   ⏳ Wait {} mins at {}", wait_mins, leg.from().name())?;
+                    writeln!(f, "  Wait {} mins at {}", wait_mins, leg.from().name())?;
                     writeln!(
                         f,
                         "--------------------------------------------------------------------"
@@ -208,7 +215,7 @@ impl std::fmt::Display for Plan {
                     };
                     writeln!(
                         f,
-                        "Leg {}: [🚆 Transit ({}) - {} mins, {}]",
+                        "Leg {}: [Transit ({}) - {} mins, {}]",
                         i + 1,
                         trip_id,
                         ride_mins,
@@ -216,11 +223,11 @@ impl std::fmt::Display for Plan {
                     )?;
                     writeln!(
                         f,
-                        "   Board:   {:40} @ {}",
+                        "  Board:   {:40} @ {}",
                         from.name(),
                         departure_time.time
                     )?;
-                    writeln!(f, "   Alight:  {:40} @ {}", to.name(), arrival_time.time)?;
+                    writeln!(f, "  Alight:  {:40} @ {}", to.name(), arrival_time.time)?;
                 }
                 Leg::Walk {
                     from,
@@ -243,7 +250,7 @@ impl std::fmt::Display for Plan {
 
                     writeln!(
                         f,
-                        "Leg {}: [🚶 {} ({:.2} mi, {} mins)]",
+                        "Leg {}: [{} ({:.2} mi, {} mins)]",
                         i + 1,
                         walk_label,
                         distance_miles,
@@ -251,11 +258,11 @@ impl std::fmt::Display for Plan {
                     )?;
                     writeln!(
                         f,
-                        "   Start:   {:40} @ {}",
+                        "  Start:   {:40} @ {}",
                         from.name(),
                         departure_time.time
                     )?;
-                    writeln!(f, "   End:     {:40} @ {}", to.name(), arrival_time.time)?;
+                    writeln!(f, "  End:     {:40} @ {}", to.name(), arrival_time.time)?;
                 }
                 Leg::Bike {
                     from,
@@ -270,18 +277,18 @@ impl std::fmt::Display for Plan {
                         .saturating_sub(departure_time.time.as_minutes());
                     writeln!(
                         f,
-                        "Leg {}: [🚲 Bike ({:.2} mi, {} mins)]",
+                        "Leg {}: [Bike ({:.2} mi, {} mins)]",
                         i + 1,
                         distance_miles,
                         bike_mins
                     )?;
                     writeln!(
                         f,
-                        "   Unlock:  {:40} @ {}",
+                        "  Unlock:  {:40} @ {}",
                         from.name(),
                         departure_time.time
                     )?;
-                    writeln!(f, "   Dock:    {:40} @ {}", to.name(), arrival_time.time)?;
+                    writeln!(f, "  Dock:    {:40} @ {}", to.name(), arrival_time.time)?;
                 }
             }
 
@@ -441,6 +448,9 @@ impl<'a> SearchContext<'a> {
     }
 
     fn explore_walk_to_bike_docks(&mut self, state: &SearchState) {
+        if !self.query.modes.allows(TransitMode::Bike) {
+            return;
+        }
         if matches!(
             state.last_leg(),
             Some(Leg::Walk { .. }) | Some(Leg::Bike { .. })
@@ -454,6 +464,11 @@ impl<'a> SearchContext<'a> {
         for (dock, dist_miles) in docks {
             if dock == state.current_location {
                 continue;
+            }
+            if let Location::Station { ref id, .. } = dock {
+                if !self.bike.can_unlock(id) {
+                    continue;
+                }
             }
             if !self.bike.can_bike_between(&state.current_location, &dock) {
                 continue;
@@ -475,6 +490,9 @@ impl<'a> SearchContext<'a> {
     }
 
     fn explore_bike_rides(&mut self, state: &SearchState) {
+        if !self.query.modes.allows(TransitMode::Bike) {
+            return;
+        }
         let candidate_docks = self
             .bike
             .find_nearby_stations(&state.current_location.get_coordinates(), 3.0);
@@ -482,6 +500,11 @@ impl<'a> SearchContext<'a> {
         for (dock, dist_miles) in candidate_docks {
             if dock == state.current_location {
                 continue;
+            }
+            if let Location::Station { ref id, .. } = dock {
+                if !self.bike.can_dock(id) {
+                    continue;
+                }
             }
             if !self.bike.can_bike_between(&state.current_location, &dock) {
                 continue;
@@ -538,7 +561,7 @@ impl<'a> SearchContext<'a> {
                     state.current_time.time + buffer
                 };
 
-                if let Some(departure) = edge.next_departure(min_dep_time, &active_services) {
+                if let Some(departure) = edge.next_departure(min_dep_time, &active_services, &self.query.modes) {
                     let dep_datetime =
                         DateTime::new(state.current_time.date, departure.departure_time);
                     let arrival_time = dep_datetime + departure.travel_time;
