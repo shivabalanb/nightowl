@@ -9,7 +9,7 @@ use crate::{
     util::{DateTime, Location, ModeSet, Time, TransitMode},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Query {
     pub origin: Location,
     pub destination: Location,
@@ -42,7 +42,7 @@ impl Query {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Leg {
     Transit {
         from: Location,
@@ -135,7 +135,7 @@ pub fn merge_consecutive_transit_legs(legs: Vec<Leg>) -> Vec<Leg> {
     merged
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Plan {
     pub origin: Location,
     pub destination: Location,

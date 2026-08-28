@@ -116,15 +116,27 @@ Leg 9: [Walk to Destination (0.08 mi, 2 mins)]
 ====================================================================
 ```
 
-### Stage 5: Web UI & Delivery Pipeline (Next.js & Map Visualizer)
-- [ ] Build high-performance Rust web API endpoint (`GET /route?origin=...&destination=...`)
-- [ ] Create Next.js interactive map frontend with Leaflet.js / Mapbox
-- [ ] Render multi-modal route step polylines on the map
+### Stage 5: Web UI & Delivery Pipeline (Axum REST API & Leaflet UI)
+- [x] Build high-performance Rust web API endpoint (`GET /api/route?origin=...&destination=...`)
+- [x] Integrate OpenStreetMap Geocoding API + Built-in NYC/NJ address book
+- [x] Create embedded minimalist interactive map frontend with Leaflet.js
+- [x] Render multi-modal route step polylines on the map (Citi Bike, PATH, MTA Subway, HBLR, Walk)
+- [x] Containerize with multi-stage Docker for one-click cloud deployment
+
+## Web Server & UI
+
+To start the local REST API and interactive web map:
+
+```bash
+cargo run --bin server
+```
+
+Open **`http://localhost:3000`** in your browser.
 
 ## CLI Usage
 
 ```bash
-# Default: run routing with all transportation modes
+# Default: run CLI routing with all transportation modes
 cargo run --release
 
 # Disable specific modes:
@@ -136,4 +148,17 @@ cargo run --release -- --no-hblr
 # Restrict to specific modes:
 cargo run --release -- --modes walk,path,mta
 ```
- multi-modal route step polylines on the map
+
+## Docker Deployment (Free Hosting)
+
+Build and run locally:
+```bash
+docker build -t nightowl .
+docker run -p 3000:3000 nightowl
+```
+
+### One-Click Cloud Deployment (Render / Koyeb / Fly.io):
+1. Push this repository to GitHub.
+2. Connect the repository on **[Render.com](https://render.com)** or **[Koyeb.com](https://koyeb.com)** as a **Docker Web Service**.
+3. Set the build environment to Docker, and deploy!
+

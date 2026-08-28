@@ -9,7 +9,7 @@ const EARTH_RADIUS_MILES: f64 = 3959.0;
 const WALKING_SPEED: f64 = 22.0; // 22 mins/mile
 const BIKING_SPEED: f64 = 7.0; // 7 mins/mile
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum DayOfWeek {
     Monday,
     Tuesday,
@@ -34,7 +34,7 @@ impl Display for DayOfWeek {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Date {
     pub year: u32,
     pub month: u32,
@@ -129,7 +129,7 @@ impl Display for Date {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Time(pub u32);
 
 impl Time {
@@ -186,7 +186,7 @@ impl Display for Time {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct DateTime {
     pub date: Date,
     pub time: Time,
@@ -248,7 +248,7 @@ impl Display for DateTime {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Coordinates {
     pub lat: f64,
     pub lon: f64,
@@ -286,9 +286,101 @@ impl Coordinates {
         let (x, y) = self.planar_offset_miles(other);
         x + y
     }
+
+    /// Resolves an address string, common alias, or "lat, lon" pair into geographical Coordinates.
+    pub fn parse_or_geocode(input: &str) -> Result<Coordinates, Box<dyn Error>> {
+        let clean = input.trim();
+
+        // 1. Try raw "lat, lon"
+        if let Some((lat_str, lon_str)) = clean.split_once(',') {
+            if let (Ok(lat), Ok(lon)) = (lat_str.trim().parse::<f64>(), lon_str.trim().parse::<f64>()) {
+                return Ok(Coordinates::new(lat, lon));
+            }
+        }
+
+        // 2. Built-in NYC/NJ Address Book
+        let lower = clean.to_lowercase();
+        match lower.as_str() {
+            "home" | "apartment" | "my place" => {
+                return Ok(Coordinates::new(40.72204775835277, -74.0368774356056));
+            }
+            "work" | "office" => {
+                return Ok(Coordinates::new(40.749719, -73.987823));
+            }
+            "vital" | "vital les" | "vital climbing" | "vital gym" => {
+                return Ok(Coordinates::new(40.71721004390394, -73.98642630279129));
+            }
+            "vital brooklyn" | "vital williamsburg" | "vital bk" => {
+                return Ok(Coordinates::new(40.721867, -73.958742));
+            }
+            "williamsburg" => {
+                return Ok(Coordinates::new(40.7163, -73.9586));
+            }
+            "dumbo" => {
+                return Ok(Coordinates::new(40.7033, -73.9892));
+            }
+            "wtc" | "world trade center" | "oculus" => {
+                return Ok(Coordinates::new(40.712582, -74.009781));
+            }
+            "herald sq" | "herald square" | "34th st" | "midtown" => {
+                return Ok(Coordinates::new(40.749719, -73.987823));
+            }
+            "times sq" | "times square" => {
+                return Ok(Coordinates::new(40.758896, -73.985130));
+            }
+            "grove st" | "grove street" | "grove" => {
+                return Ok(Coordinates::new(40.7196, -74.0431));
+            }
+            "newport" | "newport path" => {
+                return Ok(Coordinates::new(40.7270, -74.0346));
+            }
+            "exchange place" | "exchange pl" => {
+                return Ok(Coordinates::new(40.71676, -74.03238));
+            }
+            "hoboken" | "hoboken terminal" => {
+                return Ok(Coordinates::new(40.7350, -74.0290));
+            }
+            "journal square" | "jsq" => {
+                return Ok(Coordinates::new(40.7320, -74.0628));
+            }
+            "union square" | "union sq" => {
+                return Ok(Coordinates::new(40.7359, -73.9911));
+            }
+            "grand central" => {
+                return Ok(Coordinates::new(40.7527, -73.9772));
+            }
+            _ => {}
+        }
+
+        // 3. Fallback to OpenStreetMap Nominatim Geocoding API bounded to NY/NJ metro
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(4))
+            .user_agent("NightowlTransitRouter/1.0")
+            .build()?;
+
+        #[derive(serde::Deserialize)]
+        struct NominatimResult {
+            lat: String,
+            lon: String,
+        }
+
+        let url = format!(
+            "https://nominatim.openstreetmap.org/search?q={}&format=json&limit=1&viewbox=-74.3,40.9,-73.7,40.5",
+            clean.replace(' ', "+")
+        );
+
+        let res: Vec<NominatimResult> = client.get(&url).send()?.json()?;
+        if let Some(first) = res.first() {
+            let lat: f64 = first.lat.parse()?;
+            let lon: f64 = first.lon.parse()?;
+            return Ok(Coordinates::new(lat, lon));
+        }
+
+        Err(format!("Could not resolve address: '{}'", input).into())
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Location {
     Station {
         id: String,
@@ -409,7 +501,7 @@ impl std::fmt::Display for TransitMode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModeSet {
     allowed: std::collections::HashSet<TransitMode>,
 }
