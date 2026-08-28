@@ -1,5 +1,7 @@
 ## NightOwl: Navigation Compiler 
 
+Don't reinvent the wheel they said, ok I'll reinvent Google Maps. Really fun project; the actual pain point solved was supporting realtime hybrid multi-modal trips (eg. getting off MTA and taking CitiBike) and micromobility support (CitiBike docks availability).
+
 NightOwl is a multi-modal, time-dependent urban navigation engine written in Rust that compiles schedules and live telemetry across PATH Rail, MTA Subway, Hudson-Bergen Light Rail (HBLR), and Citi Bike.
 
 ## System Architecture
