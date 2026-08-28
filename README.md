@@ -158,12 +158,6 @@ Build and run locally:
 docker build -t nightowl .
 docker run -p 3000:3000 nightowl
 ```
-
-### One-Click Cloud Deployment (Render / Koyeb / Fly.io):
-1. Push this repository to GitHub.
-2. Connect the repository on **[Render.com](https://render.com)** or **[Koyeb.com](https://koyeb.com)** as a **Docker Web Service**.
-3. Set the build environment to Docker, and deploy!
-
 ---
 
 ## Live Interface Preview
