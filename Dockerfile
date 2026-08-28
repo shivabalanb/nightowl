@@ -1,15 +1,6 @@
-# Stage 1: Build binary with cached dependencies
-FROM rust:1.85-bookworm AS builder
+# Stage 1: Build binary
+FROM rust:bookworm AS builder
 WORKDIR /app
-
-# Cache dependency layer
-COPY Cargo.toml Cargo.lock ./
-RUN mkdir -p src/bin src/ui && \
-    echo "fn main() {}" > src/main.rs && \
-    echo "fn main() {}" > src/bin/server.rs && \
-    echo "pub fn lib() {}" > src/lib.rs && \
-    touch src/ui/index.html && \
-    cargo build --release || true
 
 # Copy entire source tree & data
 COPY . .
