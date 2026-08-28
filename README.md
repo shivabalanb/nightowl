@@ -4,36 +4,57 @@ NightOwl is a multi-modal, time-dependent urban navigation engine written in Rus
 
 ## System Architecture
 
-This diagram visualizes how raw transit schedules and live streams are compiled into an optimized, in-memory graph.
+Nightowl compiles static schedules and live real-time streams into an in-memory multi-modal graph served through a high-performance routing engine and REST API.
 
 ```mermaid
-graph LR
-    subgraph External ["Live & Static Feeds"]
-        PATH["PATH Rail (GTFS + Live RidePATH)"]
-        CB["Citi Bike (GBFS Live Station Status)"]
-        MTA["MTA Subway (GTFS Timetable)"]
-        HBLR["NJ Transit / HBLR (GTFS API)"]
+flowchart TB
+    %% Data Sources
+    subgraph FEEDS["1. Static Timetables & Live Feeds"]
+        direction LR
+        P_FEED["PATH Rail<br/><code>GTFS Static + RidePATH Live</code>"]
+        M_FEED["MTA Subway<br/><code>GTFS Timetable</code>"]
+        H_FEED["NJ Transit / HBLR<br/><code>Developer GTFS API</code>"]
+        C_FEED["Citi Bike<br/><code>GBFS Live Status</code>"]
     end
 
-    subgraph Backend ["Backend (Rust)"]
-        ING["Ingestion & Live Feeds"]
-        GRAPH["In-Memory Multi-Modal Graph"]
-        FILTER["ModeSet Filter (CLI / API)"]
-        ROUTE["Time-Dependent Dijkstra Router"]
-        
-        ING --> GRAPH
-        GRAPH --> ROUTE
-        FILTER --> ROUTE
+    %% Ingestion & Memory Layer
+    subgraph INGESTION["2. In-Memory Graph Compiler"]
+        direction TB
+        subgraph STATE["Arc&lt;AppState&gt; (Thread-Safe Shared State)"]
+            T_NET["<b>TransitNetwork (RwLock)</b><br/>681 Stations • Unified Adjacency Graph<br/>Time-Dependent Schedules &amp; Services"]
+            B_NET["<b>BikeNetwork (RwLock)</b><br/>2,508 Docks • Live Bike/Slot Availability"]
+        end
+        SYNC["Background Heartbeat Thread<br/><i>30-Second Real-Time Telemetry Sync</i>"]
     end
 
-    subgraph Client ["Client / CLI"]
-        CLI["CLI Tool (nightowl)"]
-        UI["Web UI & Map Visualizer"]
+    %% Routing Core
+    subgraph ENGINE["3. Multi-Modal Routing Engine"]
+        direction TB
+        GEO["<b>Address Geocoder</b><br/>Local NYC/NJ Address Book + Nominatim"]
+        FILTER["<b>ModeSet Filter</b><br/>Declarative Modal Filtering (Walk, Bike, PATH, MTA, HBLR)"]
+        ROUTER["<b>Time-Dependent Dijkstra Search</b><br/>Multi-Agency Transfers • Dock Constraints • Real-Time Countdowns"]
     end
 
-    PATH & CB & MTA & HBLR --> ING
-    CLI <--> ROUTE
-    UI <--> ROUTE
+    %% Delivery & Interface Layer
+    subgraph DELIVERY["4. Delivery Interfaces"]
+        direction LR
+        REST["<b>Axum REST API</b><br/><code>/api/route</code> • <code>/api/stations</code> • <code>/api/health</code>"]
+        CLI["<b>CLI Engine</b><br/><code>nightowl --modes ...</code>"]
+        UI["<b>Minimalist Web UI</b><br/>Interactive Map • Real-Time Polylines • Step Itinerary"]
+    end
+
+    %% Flow Connections
+    P_FEED & M_FEED & H_FEED --> T_NET
+    C_FEED --> B_NET
+    SYNC -.->|Live Departures &amp; Vacancies| STATE
+
+    GEO --> FILTER
+    FILTER --> ROUTER
+    STATE --> ROUTER
+
+    ROUTER --> REST
+    ROUTER --> CLI
+    REST --> UI
 ```
 
 ## Project Roadmap
