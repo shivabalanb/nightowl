@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nightowl | Transit Router</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦉</text></svg>">
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Leaflet CSS & JS -->
@@ -59,6 +60,7 @@
           <button onclick="applySavedPlace('Vital Brooklyn')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">Vital BK</button>
           <button onclick="applySavedPlace('WTC')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">WTC</button>
           <button onclick="applySavedPlace('Hoboken')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">Hoboken</button>
+          <button onclick="applySavedPlace('Exchange Pl')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">Exchange Pl</button>
         </div>
 
         <!-- Unified Compact Inputs Card with Zero-Overlap Swap -->
@@ -77,6 +79,7 @@
                 <option value="WTC">WTC</option>
                 <option value="Hoboken">Hoboken</option>
                 <option value="Newport">Newport</option>
+                <option value="Exchange Pl">Exchange Pl</option>
                 <option value="Grove St">Grove St</option>
                 <option value="Herald Sq">Herald Sq</option>
               </select>
@@ -95,6 +98,7 @@
                 <option value="WTC">WTC</option>
                 <option value="Hoboken">Hoboken</option>
                 <option value="Newport">Newport</option>
+                <option value="Exchange Pl">Exchange Pl</option>
                 <option value="Grove St">Grove St</option>
                 <option value="Herald Sq">Herald Sq</option>
               </select>
@@ -116,7 +120,7 @@
             <button id="mode-path" onclick="toggleMode('path')" class="px-2 py-1 rounded text-[10px] font-mono font-medium border border-red-700/60 bg-red-950/40 text-red-400 transition-all">
               PATH
             </button>
-            <button id="mode-mta" onclick="toggleMode('mta')" class="px-2 py-1 rounded text-[10px] font-mono font-medium border border-amber-700/60 bg-amber-950/40 text-amber-400 transition-all">
+            <button id="mode-mta" onclick="toggleMode('mta')" class="px-2 py-1 rounded text-[10px] font-mono font-medium opacity-30 border border-zinc-800 bg-zinc-900 text-zinc-500 transition-all">
               MTA
             </button>
             <button id="mode-hblr" onclick="toggleMode('hblr')" class="px-2 py-1 rounded text-[10px] font-mono font-medium border border-emerald-700/60 bg-emerald-950/40 text-emerald-400 transition-all">
@@ -183,7 +187,7 @@
     }).addTo(map);
 
     // Active Modes State
-    const activeModes = { bike: true, path: true, mta: true, hblr: true };
+    const activeModes = { bike: true, path: true, mta: false, hblr: true };
     let routeLayers = [];
     let lastFocusedInput = 'dest';
 
@@ -193,6 +197,20 @@
       const h = Math.floor(mins / 60) % 24;
       const m = mins % 60;
       return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    function fmtDuration(mins, compact = false) {
+      if (typeof mins !== 'number' || isNaN(mins)) return '--';
+      if (mins < 60) {
+        return compact ? `${mins}m` : `${mins} mins`;
+      }
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      if (compact) {
+        return m === 0 ? `${h}h` : `${h}h ${m}m`;
+      }
+      const hrWord = h === 1 ? 'hr' : 'hrs';
+      return m === 0 ? `${h} ${hrWord}` : `${h} ${hrWord} ${m} mins`;
     }
 
     function toggleMode(mode) {
@@ -233,6 +251,16 @@
       const dest = document.getElementById('destInput').value.trim();
       if (!orig || !dest) return;
 
+      // Clear previous route stats, duration, and map layers while loading
+      document.getElementById('statsPanel').classList.add('hidden');
+      document.getElementById('statDuration').textContent = '--';
+      document.getElementById('statWalk').textContent = '--';
+      document.getElementById('statBike').textContent = '--';
+      document.getElementById('statTransit').textContent = '--';
+      document.getElementById('statWait').textContent = '--';
+      routeLayers.forEach(l => map.removeLayer(l));
+      routeLayers = [];
+
       document.getElementById('itineraryContainer').innerHTML = `
         <div class="text-center py-10 text-zinc-500 font-mono text-xs">
           Computing optimal route...
@@ -263,6 +291,7 @@
 
         renderPlan(data.plan, data.stats);
       } catch (err) {
+        document.getElementById('statsPanel').classList.add('hidden');
         document.getElementById('itineraryContainer').innerHTML = `
           <div class="p-3 bg-red-950/30 border border-red-900/50 rounded text-red-400 text-xs font-mono">
             Network error: ${err.message}
@@ -277,11 +306,11 @@
 
       if (stats) {
         document.getElementById('statsPanel').classList.remove('hidden');
-        document.getElementById('statDuration').textContent = `${stats.total_duration_mins} mins`;
-        document.getElementById('statWalk').textContent = `${stats.walk_mins}m`;
-        document.getElementById('statBike').textContent = `${stats.bike_mins}m`;
-        document.getElementById('statTransit').textContent = `${stats.transit_mins}m`;
-        document.getElementById('statWait').textContent = `${stats.wait_mins}m`;
+        document.getElementById('statDuration').textContent = fmtDuration(stats.total_duration_mins);
+        document.getElementById('statWalk').textContent = fmtDuration(stats.walk_mins, true);
+        document.getElementById('statBike').textContent = fmtDuration(stats.bike_mins, true);
+        document.getElementById('statTransit').textContent = fmtDuration(stats.transit_mins, true);
+        document.getElementById('statWait').textContent = fmtDuration(stats.wait_mins, true);
       }
 
       const container = document.getElementById('itineraryContainer');
@@ -373,7 +402,7 @@
               <span class="truncate text-zinc-400">Walk <span class="text-zinc-300 font-medium">${leg.Walk.distance_miles.toFixed(2)} mi</span> to <span class="text-zinc-200 font-semibold">${toName}</span></span>
             </div>
             <span class="text-[10px] text-zinc-500 font-medium shrink-0 ml-2">
-              ${durationMins}m
+              ${fmtDuration(durationMins, true)}
             </span>
           `;
         } else {
@@ -385,7 +414,7 @@
                 ${label}
               </span>
               <span class="font-mono text-[11px] bg-zinc-950 text-zinc-300 px-2 py-0.5 rounded border border-zinc-800 font-medium">
-                ${fmtTime(depTime)} → ${fmtTime(arrTime)} (${durationMins}m)
+                ${fmtTime(depTime)} → ${fmtTime(arrTime)} (${fmtDuration(durationMins, true)})
               </span>
             </div>
             <div class="space-y-1.5 text-xs font-mono pl-1">

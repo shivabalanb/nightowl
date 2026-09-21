@@ -18,7 +18,7 @@ use tower_http::cors::{Any, CorsLayer};
 use nightowl::{
     bike_network::BikeNetwork,
     realtime::NjtClient,
-    router::{Plan, Query, find_route},
+    router::{Plan, Query, RouteStats, find_route},
     transit_network::TransitNetwork,
     util::{Coordinates, DateTime, Location, ModeSet, Time, TransitMode},
 };
@@ -38,17 +38,6 @@ pub struct RouteParams {
     pub dest_lon: Option<f64>,
     pub departure_time: Option<String>,
     pub modes: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct RouteStats {
-    pub total_duration_mins: u32,
-    pub walk_mins: u32,
-    pub bike_mins: u32,
-    pub transit_mins: u32,
-    pub wait_mins: u32,
-    pub walk_miles: f64,
-    pub bike_miles: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -324,50 +313,7 @@ async fn handle_route(
     let bike = state.bike.read().unwrap();
 
     if let Some(plan) = find_route(&transit, &bike, query) {
-        let mut walk_mins = 0;
-        let mut bike_mins = 0;
-        let mut transit_mins = 0;
-        let mut wait_mins = 0;
-        let mut walk_dist = 0.0;
-        let mut bike_dist = 0.0;
-
-        for (i, leg) in plan.legs.iter().enumerate() {
-            if i > 0 {
-                let prev_arr = plan.legs[i - 1].arrival_time().time.as_minutes();
-                let curr_dep = leg.departure_time().time.as_minutes();
-                wait_mins += curr_dep.saturating_sub(prev_arr);
-            }
-            match leg {
-                nightowl::router::Leg::Walk { distance_miles, departure_time, arrival_time, .. } => {
-                    walk_mins += arrival_time.time.as_minutes().saturating_sub(departure_time.time.as_minutes());
-                    walk_dist += distance_miles;
-                }
-                nightowl::router::Leg::Bike { distance_miles, departure_time, arrival_time, .. } => {
-                    bike_mins += arrival_time.time.as_minutes().saturating_sub(departure_time.time.as_minutes());
-                    bike_dist += distance_miles;
-                }
-                nightowl::router::Leg::Transit { departure_time, arrival_time, .. } => {
-                    transit_mins += arrival_time.time.as_minutes().saturating_sub(departure_time.time.as_minutes());
-                }
-            }
-        }
-
-        let total_mins = plan
-            .legs
-            .last()
-            .map(|l| l.arrival_time().time.as_minutes().saturating_sub(plan.departure_time.time.as_minutes()))
-            .unwrap_or(0);
-
-        let stats = RouteStats {
-            total_duration_mins: total_mins,
-            walk_mins,
-            bike_mins,
-            transit_mins,
-            wait_mins,
-            walk_miles: (walk_dist * 100.0).round() / 100.0,
-            bike_miles: (bike_dist * 100.0).round() / 100.0,
-        };
-
+        let stats = plan.stats();
         Json(RouteResponse {
             success: true,
             plan: Some(plan),

@@ -135,6 +135,17 @@ pub fn merge_consecutive_transit_legs(legs: Vec<Leg>) -> Vec<Leg> {
     merged
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RouteStats {
+    pub total_duration_mins: u32,
+    pub walk_mins: u32,
+    pub bike_mins: u32,
+    pub transit_mins: u32,
+    pub wait_mins: u32,
+    pub walk_miles: f64,
+    pub bike_miles: f64,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Plan {
     pub origin: Location,
@@ -143,6 +154,83 @@ pub struct Plan {
     pub arrival_time: DateTime,
     pub legs: Vec<Leg>,
 }
+
+impl Plan {
+    pub fn stats(&self) -> RouteStats {
+        let mut walk_mins = 0;
+        let mut bike_mins = 0;
+        let mut transit_mins = 0;
+        let mut wait_mins = 0;
+        let mut walk_dist = 0.0;
+        let mut bike_dist = 0.0;
+
+        for (i, leg) in self.legs.iter().enumerate() {
+            if i > 0 {
+                let prev_arr = self.legs[i - 1].arrival_time().time.as_minutes();
+                let curr_dep = leg.departure_time().time.as_minutes();
+                wait_mins += curr_dep.saturating_sub(prev_arr);
+            }
+            match leg {
+                Leg::Walk {
+                    distance_miles,
+                    departure_time,
+                    arrival_time,
+                    ..
+                } => {
+                    walk_mins += arrival_time
+                        .time
+                        .as_minutes()
+                        .saturating_sub(departure_time.time.as_minutes());
+                    walk_dist += distance_miles;
+                }
+                Leg::Bike {
+                    distance_miles,
+                    departure_time,
+                    arrival_time,
+                    ..
+                } => {
+                    bike_mins += arrival_time
+                        .time
+                        .as_minutes()
+                        .saturating_sub(departure_time.time.as_minutes());
+                    bike_dist += distance_miles;
+                }
+                Leg::Transit {
+                    departure_time,
+                    arrival_time,
+                    ..
+                } => {
+                    transit_mins += arrival_time
+                        .time
+                        .as_minutes()
+                        .saturating_sub(departure_time.time.as_minutes());
+                }
+            }
+        }
+
+        let total_duration_mins = self
+            .legs
+            .last()
+            .map(|l| {
+                l.arrival_time()
+                    .time
+                    .as_minutes()
+                    .saturating_sub(self.departure_time.time.as_minutes())
+            })
+            .unwrap_or(0);
+
+        RouteStats {
+            total_duration_mins,
+            walk_mins,
+            bike_mins,
+            transit_mins,
+            wait_mins,
+            walk_miles: (walk_dist * 100.0).round() / 100.0,
+            bike_miles: (bike_dist * 100.0).round() / 100.0,
+        }
+    }
+}
+
 
 impl std::fmt::Display for Plan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -647,3 +735,57 @@ pub fn find_route(transit: &TransitNetwork, bike: &BikeNetwork, query: Query) ->
 
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util::{Coordinates, Date};
+
+    #[test]
+    fn test_plan_stats_calculation() {
+        let date = Date::new(2026, 9, 21);
+        let dep = DateTime::new(date, Time::from_minutes(8 * 60));
+
+        let walk_dep = dep;
+        let walk_arr = DateTime::new(date, Time::from_minutes(8 * 60 + 10));
+
+        // 5 minute wait before transit
+        let transit_dep = DateTime::new(date, Time::from_minutes(8 * 60 + 15));
+        let transit_arr = DateTime::new(date, Time::from_minutes(8 * 60 + 30));
+
+        let leg1 = Leg::Walk {
+            from: Location::Point(Coordinates::new(40.0, -74.0)),
+            to: Location::Point(Coordinates::new(40.01, -74.0)),
+            distance_miles: 0.5,
+            departure_time: walk_dep,
+            arrival_time: walk_arr,
+        };
+
+        let leg2 = Leg::Transit {
+            from: Location::Point(Coordinates::new(40.01, -74.0)),
+            to: Location::Point(Coordinates::new(40.05, -74.0)),
+            trip_id: "test_trip".to_string(),
+            departure_time: transit_dep,
+            arrival_time: transit_arr,
+            stops_count: 3,
+        };
+
+        let plan = Plan {
+            origin: Location::Point(Coordinates::new(40.0, -74.0)),
+            destination: Location::Point(Coordinates::new(40.05, -74.0)),
+            departure_time: dep,
+            arrival_time: transit_arr,
+            legs: vec![leg1, leg2],
+        };
+
+        let stats = plan.stats();
+        assert_eq!(stats.total_duration_mins, 30);
+        assert_eq!(stats.walk_mins, 10);
+        assert_eq!(stats.transit_mins, 15);
+        assert_eq!(stats.wait_mins, 5);
+        assert_eq!(stats.bike_mins, 0);
+        assert_eq!(stats.walk_miles, 0.5);
+        assert_eq!(stats.bike_miles, 0.0);
+    }
+}
+

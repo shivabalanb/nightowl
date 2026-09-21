@@ -334,7 +334,7 @@ impl Coordinates {
             "newport" | "newport path" => {
                 return Ok(Coordinates::new(40.7270, -74.0346));
             }
-            "exchange place" | "exchange pl" => {
+            "exchange place" | "exchange pl" | "exchange" => {
                 return Ok(Coordinates::new(40.71676, -74.03238));
             }
             "hoboken" | "hoboken terminal" => {
