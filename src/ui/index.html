@@ -32,25 +32,56 @@
       </div>
       <div class="flex items-center gap-2">
         <span class="font-semibold text-xs tracking-wide text-zinc-100 lowercase">nightowl</span>
-        <span class="text-[10px] text-zinc-500 font-mono">v0.1</span>
+        <span class="text-[10px] text-zinc-500 font-mono">v0.2</span>
       </div>
     </div>
 
-    <!-- Live Status -->
-    <div class="flex items-center gap-2 text-[11px] font-mono text-zinc-400 bg-zinc-950 px-2.5 py-1 rounded border border-zinc-800">
-      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-      <span>Live Sync Active</span>
+    <!-- Header Actions -->
+    <div class="flex items-center gap-2">
+      <!-- Mobile Segmented View Toggle [ Route | Map ] -->
+      <div class="flex md:hidden bg-zinc-950 p-0.5 rounded border border-zinc-800 text-[11px] font-mono">
+        <button id="viewBtnRoute" onclick="setMobileView('route')" class="px-2.5 py-1 rounded bg-zinc-800 text-zinc-100 font-semibold transition-all">Route</button>
+        <button id="viewBtnMap" onclick="setMobileView('map')" class="px-2.5 py-1 rounded text-zinc-400 hover:text-zinc-200 transition-all">Map</button>
+      </div>
+
+      <!-- Live Status -->
+      <div class="hidden sm:flex items-center gap-2 text-[11px] font-mono text-zinc-400 bg-zinc-950 px-2.5 py-1 rounded border border-zinc-800">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+        <span>Live Sync Active</span>
+      </div>
     </div>
   </header>
 
   <!-- Main View Grid -->
   <div class="flex flex-1 overflow-hidden relative">
     
-    <!-- Sidebar -->
-    <div class="w-full md:w-[420px] bg-zinc-900 border-r border-zinc-800 flex flex-col h-full z-10 shrink-0 shadow-2xl">
+    <!-- Sidebar / Route View -->
+    <div id="sidebarView" class="w-full md:w-[420px] bg-zinc-900 border-r border-zinc-800 flex flex-col h-full z-10 shrink-0 shadow-2xl">
       
-      <!-- Compact Query Controls -->
-      <div class="p-3 border-b border-zinc-800 space-y-2 bg-zinc-900">
+      <!-- Collapsed Query Summary Bar (Mobile, Click to Expand) -->
+      <div id="collapsedQueryBar" onclick="toggleQueryControls(true)" class="hidden md:hidden p-2.5 bg-zinc-900 border-b border-zinc-800 items-center justify-between cursor-pointer hover:bg-zinc-800/70 transition-colors">
+        <div class="flex items-center gap-2 truncate">
+          <span class="text-zinc-500 text-[10px] uppercase font-bold font-mono shrink-0">Route</span>
+          <span id="collapsedSummaryText" class="font-mono text-xs text-zinc-200 font-semibold truncate">Home → Vital LES</span>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-mono hover:text-zinc-200 border border-zinc-700/60 flex items-center gap-1">
+            <span>Edit</span>
+            <span>▾</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Full Query Controls -->
+      <div id="fullQueryControls" class="p-3 border-b border-zinc-800 space-y-2 bg-zinc-900 md:block">
+        <!-- Mobile Header with Collapse button -->
+        <div class="flex md:hidden items-center justify-between pb-1 border-b border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+          <span class="font-semibold text-zinc-300">Route Query</span>
+          <button onclick="toggleQueryControls(false)" class="text-zinc-400 hover:text-zinc-200 px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700/60 text-[10px] flex items-center gap-1">
+            <span>Collapse</span>
+            <span>▲</span>
+          </button>
+        </div>
         
         <!-- Saved Places Single Row -->
         <div class="flex gap-1 overflow-x-auto no-scrollbar text-[10px] font-mono text-zinc-400">
@@ -134,29 +165,23 @@
         </div>
       </div>
 
-      <!-- Prominent Stats Breakdown with Generous Padding -->
-      <div id="statsPanel" class="p-5 border-b border-zinc-800 bg-zinc-950/80 hidden space-y-3.5">
-        <div class="flex items-center justify-between px-1">
-          <span class="text-xs font-mono uppercase tracking-wider text-zinc-400 font-medium">Total Duration</span>
-          <span id="statDuration" class="text-2xl font-black text-white font-mono tracking-tight shrink-0">--</span>
+      <!-- Mobile Inline Stats Bar (Visible on mobile Route view) -->
+      <div id="mobileStatsBar" class="hidden md:hidden px-4 py-3.5 bg-zinc-950/95 border-b border-zinc-800/80 flex items-center justify-between text-xs font-mono shrink-0">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="mobileStatDuration" class="text-white font-black text-lg tracking-tight">--</span>
         </div>
-        <div class="grid grid-cols-4 gap-2.5 text-center font-mono">
-          <div class="bg-zinc-900/90 py-3 px-1.5 rounded-lg border border-zinc-800 flex flex-col justify-center shadow-sm">
-            <div class="text-[10px] text-zinc-500 uppercase tracking-wider">WALK</div>
-            <div id="statWalk" class="text-zinc-200 font-bold text-sm mt-1 truncate">--</div>
-          </div>
-          <div class="bg-zinc-900/90 py-3 px-1.5 rounded-lg border border-zinc-800 flex flex-col justify-center shadow-sm">
-            <div class="text-[10px] text-cyan-400 uppercase tracking-wider">BIKE</div>
-            <div id="statBike" class="text-cyan-300 font-bold text-sm mt-1 truncate">--</div>
-          </div>
-          <div class="bg-zinc-900/90 py-3 px-1.5 rounded-lg border border-zinc-800 flex flex-col justify-center shadow-sm">
-            <div class="text-[10px] text-red-400 uppercase tracking-wider">TRANSIT</div>
-            <div id="statTransit" class="text-red-300 font-bold text-sm mt-1 truncate">--</div>
-          </div>
-          <div class="bg-zinc-900/90 py-3 px-1.5 rounded-lg border border-zinc-800 flex flex-col justify-center shadow-sm">
-            <div class="text-[10px] text-amber-400 uppercase tracking-wider">WAIT</div>
-            <div id="statWait" class="text-amber-300 font-bold text-sm mt-1 truncate">--</div>
-          </div>
+        <div class="flex items-center gap-3 text-zinc-400 text-xs">
+          <span class="flex items-center gap-1" title="Walk"><span class="text-sm">🚶</span><span id="mobileStatWalk" class="text-zinc-200 font-bold">--</span></span>
+          <span class="flex items-center gap-1" title="Citi Bike">
+            <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h3"/></svg>
+            <span id="mobileStatBike" class="text-cyan-300 font-bold">--</span>
+          </span>
+          <span class="flex items-center gap-1" title="Transit"><span class="text-sm">🚇</span><span id="mobileStatTransit" class="text-red-300 font-bold">--</span></span>
+          <span class="flex items-center gap-1" title="Wait">
+            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            <span id="mobileStatWait" class="text-amber-300 font-bold">--</span>
+          </span>
         </div>
       </div>
 
@@ -169,15 +194,50 @@
 
     </div>
 
-    <!-- Map Canvas -->
-    <div id="map" class="flex-1 h-full w-full"></div>
+    <!-- Map Canvas & Overlays -->
+    <div id="mapView" class="hidden md:block relative flex-1 h-full w-full">
+      <div id="map" class="h-full w-full"></div>
+
+      <!-- Floating Duration & Stats Card on Top Right of Map -->
+      <div id="statsPanel" class="absolute top-4 right-4 z-[1000] hidden bg-zinc-900/90 backdrop-blur-md border border-zinc-800 rounded-xl shadow-2xl p-3.5 space-y-2.5 font-mono min-w-[260px] sm:min-w-[280px] max-w-[calc(100vw-32px)] pointer-events-auto">
+        <div class="flex items-center justify-between gap-6 px-1">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Total Duration</span>
+          </div>
+          <span id="statDuration" class="text-2xl font-black text-white tracking-tight shrink-0">--</span>
+        </div>
+        <div class="grid grid-cols-4 gap-2 text-center">
+          <div class="bg-zinc-950/70 py-2 px-1.5 rounded-lg border border-zinc-800/80 flex flex-col items-center justify-center">
+            <span class="text-sm select-none h-4 flex items-center justify-center mb-0.5" title="Walk">🚶</span>
+            <div id="statWalk" class="text-zinc-200 font-bold text-xs truncate">--</div>
+          </div>
+          <div class="bg-zinc-950/70 py-2 px-1.5 rounded-lg border border-zinc-800/80 flex flex-col items-center justify-center">
+            <div class="h-4 flex items-center justify-center mb-0.5">
+              <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h3"/></svg>
+            </div>
+            <div id="statBike" class="text-cyan-300 font-bold text-xs truncate">--</div>
+          </div>
+          <div class="bg-zinc-950/70 py-2 px-1.5 rounded-lg border border-zinc-800/80 flex flex-col items-center justify-center">
+            <span class="text-sm select-none h-4 flex items-center justify-center mb-0.5" title="Transit">🚇</span>
+            <div id="statTransit" class="text-red-300 font-bold text-xs truncate">--</div>
+          </div>
+          <div class="bg-zinc-950/70 py-2 px-1.5 rounded-lg border border-zinc-800/80 flex flex-col items-center justify-center">
+            <div class="h-4 flex items-center justify-center mb-0.5">
+              <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            </div>
+            <div id="statWait" class="text-amber-300 font-bold text-xs truncate">--</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
   </div>
 
   <script>
     // 1. Initialize Map
     const map = L.map('map', { zoomControl: false }).setView([40.7250, -74.0150], 13);
-    L.control.zoom({ position: 'topright' }).addTo(map);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     // 100% Free OpenStreetMap with Clean Dark Filter (Zero API Key / Zero Watermarks)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -190,6 +250,70 @@
     const activeModes = { bike: true, path: true, mta: false, hblr: true };
     let routeLayers = [];
     let lastFocusedInput = 'dest';
+    let currentMobileView = 'route';
+
+    function setMobileView(view) {
+      currentMobileView = view;
+      const sidebar = document.getElementById('sidebarView');
+      const mapView = document.getElementById('mapView');
+      const btnRoute = document.getElementById('viewBtnRoute');
+      const btnMap = document.getElementById('viewBtnMap');
+
+      if (view === 'route') {
+        sidebar.classList.remove('hidden');
+        mapView.classList.add('hidden');
+        mapView.classList.remove('block');
+
+        btnRoute.classList.add('bg-zinc-800', 'text-zinc-100', 'font-semibold');
+        btnRoute.classList.remove('text-zinc-400');
+        btnMap.classList.remove('bg-zinc-800', 'text-zinc-100', 'font-semibold');
+        btnMap.classList.add('text-zinc-400');
+      } else {
+        sidebar.classList.add('hidden');
+        mapView.classList.remove('hidden');
+        mapView.classList.add('block');
+
+        btnMap.classList.add('bg-zinc-800', 'text-zinc-100', 'font-semibold');
+        btnMap.classList.remove('text-zinc-400');
+        btnRoute.classList.remove('bg-zinc-800', 'text-zinc-100', 'font-semibold');
+        btnRoute.classList.add('text-zinc-400');
+
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 100);
+      }
+    }
+
+    function toggleQueryControls(expanded) {
+      const full = document.getElementById('fullQueryControls');
+      const collapsed = document.getElementById('collapsedQueryBar');
+      const orig = document.getElementById('originInput').value.trim() || 'Origin';
+      const dest = document.getElementById('destInput').value.trim() || 'Destination';
+      document.getElementById('collapsedSummaryText').textContent = `${orig} → ${dest}`;
+
+      if (expanded) {
+        full.classList.remove('hidden');
+        collapsed.classList.add('hidden');
+        collapsed.classList.remove('flex');
+      } else {
+        full.classList.add('hidden');
+        collapsed.classList.remove('hidden');
+        collapsed.classList.add('flex');
+      }
+    }
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth >= 768) {
+        document.getElementById('sidebarView').classList.remove('hidden');
+        document.getElementById('mapView').classList.remove('hidden');
+        document.getElementById('fullQueryControls').classList.remove('hidden');
+        document.getElementById('collapsedQueryBar').classList.add('hidden');
+        document.getElementById('collapsedQueryBar').classList.remove('flex');
+        map.invalidateSize();
+      } else {
+        setMobileView(currentMobileView);
+      }
+    });
 
     function fmtTime(dt) {
       if (!dt || typeof dt.time === 'undefined') return '';
@@ -251,13 +375,22 @@
       const dest = document.getElementById('destInput').value.trim();
       if (!orig || !dest) return;
 
+      // Update collapsed summary
+      document.getElementById('collapsedSummaryText').textContent = `${orig} → ${dest}`;
+
       // Clear previous route stats, duration, and map layers while loading
       document.getElementById('statsPanel').classList.add('hidden');
+      document.getElementById('mobileStatsBar').classList.add('hidden');
       document.getElementById('statDuration').textContent = '--';
       document.getElementById('statWalk').textContent = '--';
       document.getElementById('statBike').textContent = '--';
       document.getElementById('statTransit').textContent = '--';
       document.getElementById('statWait').textContent = '--';
+      document.getElementById('mobileStatDuration').textContent = '--';
+      document.getElementById('mobileStatWalk').textContent = '--';
+      document.getElementById('mobileStatBike').textContent = '--';
+      document.getElementById('mobileStatTransit').textContent = '--';
+      document.getElementById('mobileStatWait').textContent = '--';
       routeLayers.forEach(l => map.removeLayer(l));
       routeLayers = [];
 
@@ -286,12 +419,14 @@
             </div>
           `;
           document.getElementById('statsPanel').classList.add('hidden');
+          document.getElementById('mobileStatsBar').classList.add('hidden');
           return;
         }
 
         renderPlan(data.plan, data.stats);
       } catch (err) {
         document.getElementById('statsPanel').classList.add('hidden');
+        document.getElementById('mobileStatsBar').classList.add('hidden');
         document.getElementById('itineraryContainer').innerHTML = `
           <div class="p-3 bg-red-950/30 border border-red-900/50 rounded text-red-400 text-xs font-mono">
             Network error: ${err.message}
@@ -311,6 +446,19 @@
         document.getElementById('statBike').textContent = fmtDuration(stats.bike_mins, true);
         document.getElementById('statTransit').textContent = fmtDuration(stats.transit_mins, true);
         document.getElementById('statWait').textContent = fmtDuration(stats.wait_mins, true);
+
+        // Mobile Stats Bar
+        document.getElementById('mobileStatsBar').classList.remove('hidden');
+        document.getElementById('mobileStatDuration').textContent = fmtDuration(stats.total_duration_mins);
+        document.getElementById('mobileStatWalk').textContent = fmtDuration(stats.walk_mins, true);
+        document.getElementById('mobileStatBike').textContent = fmtDuration(stats.bike_mins, true);
+        document.getElementById('mobileStatTransit').textContent = fmtDuration(stats.transit_mins, true);
+        document.getElementById('mobileStatWait').textContent = fmtDuration(stats.wait_mins, true);
+      }
+
+      // Auto-collapse query controls on mobile to maximize itinerary visibility
+      if (window.innerWidth < 768) {
+        toggleQueryControls(false);
       }
 
       const container = document.getElementById('itineraryContainer');
@@ -365,7 +513,7 @@
           toName = leg.Transit.to.Station?.name;
           depTime = leg.Transit.departure_time;
           arrTime = leg.Transit.arrival_time;
-          label = `${mode} (${tripId})`;
+          label = mode;
         }
 
         if (fromCoords && toCoords) {
@@ -392,6 +540,25 @@
           ? arrTime.time.saturating_sub ? arrTime.time.saturating_sub(depTime.time) : Math.max(0, arrTime.time - depTime.time)
           : 0;
 
+        let navBtn = '';
+        if (fromCoords && toCoords && fromCoords[0] && toCoords[0]) {
+          if (leg.Walk) {
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${fromCoords[0]},${fromCoords[1]}&destination=${toCoords[0]},${toCoords[1]}&travelmode=walking&dir_action=navigate`;
+            navBtn = `
+              <a href="${url}" target="_blank" rel="noopener noreferrer" title="Open Google Maps Walking Navigation" class="p-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-all shrink-0 flex items-center justify-center">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+              </a>
+            `;
+          } else if (leg.Bike) {
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${fromCoords[0]},${fromCoords[1]}&destination=${toCoords[0]},${toCoords[1]}&travelmode=bicycling&dir_action=navigate`;
+            navBtn = `
+              <a href="${url}" target="_blank" rel="noopener noreferrer" title="Open Google Maps Bicycling Navigation" class="p-1.5 rounded bg-cyan-950/70 hover:bg-cyan-900 text-cyan-300 hover:text-cyan-100 border border-cyan-800/70 transition-all shrink-0 flex items-center justify-center">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+              </a>
+            `;
+          }
+        }
+
         const card = document.createElement('div');
 
         if (leg.Walk) {
@@ -401,21 +568,27 @@
               <span class="text-zinc-600 text-xs font-bold">· · ·</span>
               <span class="truncate text-zinc-400">Walk <span class="text-zinc-300 font-medium">${leg.Walk.distance_miles.toFixed(2)} mi</span> to <span class="text-zinc-200 font-semibold">${toName}</span></span>
             </div>
-            <span class="text-[10px] text-zinc-500 font-medium shrink-0 ml-2">
-              ${fmtDuration(durationMins, true)}
-            </span>
+            <div class="flex items-center gap-2 shrink-0 ml-2">
+              <span class="text-[10px] text-zinc-500 font-medium">
+                ${fmtDuration(durationMins, true)}
+              </span>
+              ${navBtn}
+            </div>
           `;
         } else {
           card.className = 'p-3.5 bg-zinc-900/90 border border-zinc-750 rounded-xl shadow-lg hover:border-zinc-600 transition-all space-y-2.5';
           card.style.borderLeft = `4px solid ${color}`;
           card.innerHTML = `
-            <div class="flex items-center justify-between">
-              <span class="font-mono font-bold text-xs tracking-wide uppercase flex items-center gap-2" style="color: ${color}">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono font-bold text-xs tracking-wide uppercase flex items-center gap-2 truncate" style="color: ${color}">
                 ${label}
               </span>
-              <span class="font-mono text-[11px] bg-zinc-950 text-zinc-300 px-2 py-0.5 rounded border border-zinc-800 font-medium">
-                ${fmtTime(depTime)} → ${fmtTime(arrTime)} (${fmtDuration(durationMins, true)})
-              </span>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <span class="font-mono text-[11px] bg-zinc-950 text-zinc-300 px-2 py-0.5 rounded border border-zinc-800 font-medium">
+                  ${fmtTime(depTime)} → ${fmtTime(arrTime)} (${fmtDuration(durationMins, true)})
+                </span>
+                ${navBtn}
+              </div>
             </div>
             <div class="space-y-1.5 text-xs font-mono pl-1">
               <div class="flex items-center gap-2.5 text-zinc-400">

@@ -369,14 +369,30 @@ impl Coordinates {
             clean.replace(' ', "+")
         );
 
-        let res: Vec<NominatimResult> = client.get(&url).send()?.json()?;
-        if let Some(first) = res.first() {
-            let lat: f64 = first.lat.parse()?;
-            let lon: f64 = first.lon.parse()?;
-            return Ok(Coordinates::new(lat, lon));
+        let response = match client.get(&url).send() {
+            Ok(resp) => resp,
+            Err(_) => {
+                return Err(format!(
+                    "Address '{}' not recognized offline and live geocoding service is unavailable.",
+                    input
+                )
+                .into());
+            }
+        };
+
+        if let Ok(res) = response.json::<Vec<NominatimResult>>() {
+            if let Some(first) = res.first() {
+                if let (Ok(lat), Ok(lon)) = (first.lat.parse::<f64>(), first.lon.parse::<f64>()) {
+                    return Ok(Coordinates::new(lat, lon));
+                }
+            }
         }
 
-        Err(format!("Could not resolve address: '{}'", input).into())
+        Err(format!(
+            "Address '{}' was not found in the NYC/NJ metro area.",
+            input
+        )
+        .into())
     }
 }
 
