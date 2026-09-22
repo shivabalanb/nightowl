@@ -21,7 +21,7 @@
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     .safe-top {
-      padding-top: max(env(safe-area-inset-top, 0px), 14px);
+      padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
     }
     .safe-bottom {
       padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
@@ -31,7 +31,7 @@
 <body class="bg-zinc-950 text-zinc-100 flex flex-col h-screen h-[100dvh] overflow-hidden select-none safe-bottom">
 
   <!-- Header with Safe Area Inset Support -->
-  <header class="safe-top pb-3 bg-zinc-900 border-b border-zinc-800 px-4 flex items-center justify-between z-20 shrink-0">
+  <header class="safe-top pb-3.5 bg-zinc-900 border-b border-zinc-800 px-4 flex items-center justify-between z-20 shrink-0">
     <div class="flex items-center gap-2.5">
       <div class="w-7 h-7 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-sm shadow-sm">
         🦉
