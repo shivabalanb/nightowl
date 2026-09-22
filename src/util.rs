@@ -205,10 +205,44 @@ impl DateTime {
 
     pub fn now() -> Self {
         use chrono::{Datelike, Timelike};
-        let now = chrono::Local::now();
+        let utc = chrono::Utc::now();
+        let year = utc.year();
+
+        // US Eastern Time Daylight Saving Time:
+        // Starts 2nd Sunday of March at 2:00 AM EST (07:00 UTC)
+        // Ends 1st Sunday of November at 2:00 AM EDT (06:00 UTC)
+        let march_1_weekday = chrono::NaiveDate::from_ymd_opt(year, 3, 1)
+            .unwrap()
+            .weekday()
+            .num_days_from_sunday();
+        let first_sun_mar = 1 + (7 - march_1_weekday) % 7;
+        let second_sun_mar = first_sun_mar + 7;
+        let dst_start_utc = chrono::NaiveDate::from_ymd_opt(year, 3, second_sun_mar)
+            .unwrap()
+            .and_hms_opt(7, 0, 0)
+            .unwrap();
+
+        let nov_1_weekday = chrono::NaiveDate::from_ymd_opt(year, 11, 1)
+            .unwrap()
+            .weekday()
+            .num_days_from_sunday();
+        let first_sun_nov = 1 + (7 - nov_1_weekday) % 7;
+        let dst_end_utc = chrono::NaiveDate::from_ymd_opt(year, 11, first_sun_nov)
+            .unwrap()
+            .and_hms_opt(6, 0, 0)
+            .unwrap();
+
+        let naive_utc = utc.naive_utc();
+        let offset_hours = if naive_utc >= dst_start_utc && naive_utc < dst_end_utc {
+            -4 // EDT
+        } else {
+            -5 // EST
+        };
+
+        let eastern = naive_utc + chrono::Duration::hours(offset_hours);
         DateTime {
-            date: Date::new(now.year() as u32, now.month(), now.day()),
-            time: Time::from_minutes(now.hour() * 60 + now.minute()),
+            date: Date::new(eastern.year() as u32, eastern.month(), eastern.day()),
+            time: Time::from_minutes(eastern.hour() * 60 + eastern.minute()),
         }
     }
 
@@ -570,3 +604,18 @@ impl ModeSet {
         list.join(", ")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_datetime_now_eastern_time() {
+        let now = DateTime::now();
+        assert!(now.date.year >= 2024);
+        assert!(now.date.month >= 1 && now.date.month <= 12);
+        assert!(now.date.day >= 1 && now.date.day <= 31);
+        assert!(now.time.as_minutes() < 1440);
+    }
+}
+

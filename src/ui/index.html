@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Nightowl | Transit Router</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦉</text></svg>">
   <!-- Tailwind CSS -->
@@ -20,18 +20,24 @@
     }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .safe-top {
+      padding-top: max(env(safe-area-inset-top, 0px), 14px);
+    }
+    .safe-bottom {
+      padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+    }
   </style>
 </head>
-<body class="bg-zinc-950 text-zinc-100 flex flex-col h-screen overflow-hidden select-none">
+<body class="bg-zinc-950 text-zinc-100 flex flex-col h-screen h-[100dvh] overflow-hidden select-none safe-bottom">
 
-  <!-- Minimal Header -->
-  <header class="h-12 bg-zinc-900 border-b border-zinc-800 px-4 flex items-center justify-between z-20 shrink-0">
+  <!-- Header with Safe Area Inset Support -->
+  <header class="safe-top pb-3 bg-zinc-900 border-b border-zinc-800 px-4 flex items-center justify-between z-20 shrink-0">
     <div class="flex items-center gap-2.5">
-      <div class="w-6 h-6 rounded bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs">
+      <div class="w-7 h-7 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-sm shadow-sm">
         🦉
       </div>
       <div class="flex items-center gap-2">
-        <span class="font-semibold text-xs tracking-wide text-zinc-100 lowercase">nightowl</span>
+        <span class="font-bold text-sm tracking-wide text-zinc-100 lowercase">nightowl</span>
         <span class="text-[10px] text-zinc-500 font-mono">v0.2</span>
       </div>
     </div>
@@ -39,15 +45,15 @@
     <!-- Header Actions -->
     <div class="flex items-center gap-2">
       <!-- Mobile Segmented View Toggle [ Route | Map ] -->
-      <div class="flex md:hidden bg-zinc-950 p-0.5 rounded border border-zinc-800 text-[11px] font-mono">
-        <button id="viewBtnRoute" onclick="setMobileView('route')" class="px-2.5 py-1 rounded bg-zinc-800 text-zinc-100 font-semibold transition-all">Route</button>
-        <button id="viewBtnMap" onclick="setMobileView('map')" class="px-2.5 py-1 rounded text-zinc-400 hover:text-zinc-200 transition-all">Map</button>
+      <div class="flex md:hidden bg-zinc-950 p-1 rounded-lg border border-zinc-800 text-xs font-mono shadow-inner">
+        <button id="viewBtnRoute" onclick="setMobileView('route')" class="px-3 py-1 rounded bg-zinc-800 text-zinc-100 font-semibold transition-all shadow-sm">Route</button>
+        <button id="viewBtnMap" onclick="setMobileView('map')" class="px-3 py-1 rounded text-zinc-400 hover:text-zinc-200 transition-all">Map</button>
       </div>
 
       <!-- Live Status -->
       <div class="hidden sm:flex items-center gap-2 text-[11px] font-mono text-zinc-400 bg-zinc-950 px-2.5 py-1 rounded border border-zinc-800">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-        <span>Live Sync Active</span>
+        <span>Live Sync (ET)</span>
       </div>
     </div>
   </header>
@@ -59,13 +65,13 @@
     <div id="sidebarView" class="w-full md:w-[420px] bg-zinc-900 border-r border-zinc-800 flex flex-col h-full z-10 shrink-0 shadow-2xl">
       
       <!-- Collapsed Query Summary Bar (Mobile, Click to Expand) -->
-      <div id="collapsedQueryBar" onclick="toggleQueryControls(true)" class="hidden md:hidden p-2.5 bg-zinc-900 border-b border-zinc-800 items-center justify-between cursor-pointer hover:bg-zinc-800/70 transition-colors">
+      <div id="collapsedQueryBar" onclick="toggleQueryControls(true)" class="hidden md:hidden p-3 bg-zinc-900 border-b border-zinc-800 items-center justify-between cursor-pointer hover:bg-zinc-800/70 transition-colors">
         <div class="flex items-center gap-2 truncate">
           <span class="text-zinc-500 text-[10px] uppercase font-bold font-mono shrink-0">Route</span>
-          <span id="collapsedSummaryText" class="font-mono text-xs text-zinc-200 font-semibold truncate">Home → Vital LES</span>
+          <span id="collapsedSummaryText" class="font-mono text-xs text-zinc-200 font-semibold truncate">Current Location → Vital LES</span>
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
-          <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-mono hover:text-zinc-200 border border-zinc-700/60 flex items-center gap-1">
+          <span class="px-2.5 py-1 rounded bg-zinc-800 text-zinc-300 text-xs font-mono hover:text-white border border-zinc-700/80 flex items-center gap-1 shadow-sm">
             <span>Edit</span>
             <span>▾</span>
           </span>
@@ -73,9 +79,9 @@
       </div>
 
       <!-- Full Query Controls -->
-      <div id="fullQueryControls" class="p-3 border-b border-zinc-800 space-y-2 bg-zinc-900 md:block">
+      <div id="fullQueryControls" class="p-3 border-b border-zinc-800 space-y-2.5 bg-zinc-900 md:block">
         <!-- Mobile Header with Collapse button -->
-        <div class="flex md:hidden items-center justify-between pb-1 border-b border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+        <div class="flex md:hidden items-center justify-between pb-1.5 border-b border-zinc-800/60 text-[11px] font-mono text-zinc-400">
           <span class="font-semibold text-zinc-300">Route Query</span>
           <button onclick="toggleQueryControls(false)" class="text-zinc-400 hover:text-zinc-200 px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700/60 text-[10px] flex items-center gap-1">
             <span>Collapse</span>
@@ -84,7 +90,11 @@
         </div>
         
         <!-- Saved Places Single Row -->
-        <div class="flex gap-1 overflow-x-auto no-scrollbar text-[10px] font-mono text-zinc-400">
+        <div class="flex gap-1.5 overflow-x-auto no-scrollbar text-[10px] font-mono text-zinc-400 items-center">
+          <button onclick="useCurrentLocation()" id="btnCurrentLoc" class="px-2.5 py-1 rounded-md bg-blue-950/80 hover:bg-blue-900 text-blue-300 border border-blue-700/70 whitespace-nowrap transition-all flex items-center gap-1 font-semibold shadow-sm">
+            <span class="text-xs">📍</span>
+            <span>Current Location</span>
+          </button>
           <button onclick="applySavedPlace('Home')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">Home</button>
           <button onclick="applySavedPlace('Work')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">Work</button>
           <button onclick="applySavedPlace('Vital LES')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">Vital LES</button>
@@ -100,9 +110,11 @@
             <!-- Origin -->
             <div class="flex items-center gap-1.5 px-2 py-1 bg-zinc-900/60 rounded focus-within:bg-zinc-900 transition-colors">
               <span class="text-zinc-500 text-[10px] uppercase font-bold shrink-0 w-8">FROM</span>
-              <input id="originInput" onfocus="lastFocusedInput='origin'" onkeydown="if(event.key==='Enter') fetchRoute()" type="text" placeholder="Address or station" class="bg-transparent border-none outline-none w-full text-zinc-200 text-xs placeholder:text-zinc-600" value="Home" />
-              <select onchange="if(this.value){document.getElementById('originInput').value=this.value; this.value=''; fetchRoute();}" class="bg-zinc-800 text-zinc-400 border border-zinc-700/60 rounded text-[9px] px-1 py-0.5 outline-none hover:text-zinc-200 cursor-pointer shrink-0">
+              <button type="button" onclick="useCurrentLocation()" title="Use Current GPS Location" class="text-blue-400 hover:text-blue-300 text-xs px-0.5 py-0.5 rounded hover:bg-zinc-800 transition-colors shrink-0">📍</button>
+              <input id="originInput" onfocus="lastFocusedInput='origin'" onkeydown="if(event.key==='Enter') fetchRoute()" type="text" placeholder="Address, station, or GPS" class="bg-transparent border-none outline-none w-full text-zinc-200 text-xs placeholder:text-zinc-600" value="Current Location" />
+              <select onchange="if(this.value==='__CURRENT__'){useCurrentLocation();}else if(this.value){document.getElementById('originInput').value=this.value; this.value=''; fetchRoute();}" class="bg-zinc-800 text-zinc-400 border border-zinc-700/60 rounded text-[9px] px-1 py-0.5 outline-none hover:text-zinc-200 cursor-pointer shrink-0">
                 <option value="">Saved</option>
+                <option value="__CURRENT__">📍 Current Location</option>
                 <option value="Home">Home</option>
                 <option value="Work">Work</option>
                 <option value="Vital LES">Vital LES</option>
@@ -120,8 +132,9 @@
             <div class="flex items-center gap-1.5 px-2 py-1 bg-zinc-900/60 rounded focus-within:bg-zinc-900 transition-colors">
               <span class="text-zinc-500 text-[10px] uppercase font-bold shrink-0 w-8">TO</span>
               <input id="destInput" onfocus="lastFocusedInput='dest'" onkeydown="if(event.key==='Enter') fetchRoute()" type="text" placeholder="Address or station" class="bg-transparent border-none outline-none w-full text-zinc-200 text-xs placeholder:text-zinc-600" value="Vital LES" />
-              <select onchange="if(this.value){document.getElementById('destInput').value=this.value; this.value=''; fetchRoute();}" class="bg-zinc-800 text-zinc-400 border border-zinc-700/60 rounded text-[9px] px-1 py-0.5 outline-none hover:text-zinc-200 cursor-pointer shrink-0">
+              <select onchange="if(this.value==='__CURRENT__'){useCurrentLocation('dest');}else if(this.value){document.getElementById('destInput').value=this.value; this.value=''; fetchRoute();}" class="bg-zinc-800 text-zinc-400 border border-zinc-700/60 rounded text-[9px] px-1 py-0.5 outline-none hover:text-zinc-200 cursor-pointer shrink-0">
                 <option value="">Saved</option>
+                <option value="__CURRENT__">📍 Current Location</option>
                 <option value="Home">Home</option>
                 <option value="Work">Work</option>
                 <option value="Vital LES">Vital LES</option>
@@ -251,6 +264,8 @@
     let routeLayers = [];
     let lastFocusedInput = 'dest';
     let currentMobileView = 'route';
+    let userLocation = null; // { lat, lon }
+    let userMarker = null;
 
     function setMobileView(view) {
       currentMobileView = view;
@@ -315,12 +330,59 @@
       }
     });
 
+    function updateUserLocationMarker() {
+      if (!userLocation || !map) return;
+      if (userMarker) {
+        map.removeLayer(userMarker);
+      }
+      userMarker = L.circleMarker([userLocation.lat, userLocation.lon], {
+        radius: 7,
+        fillColor: '#38bdf8',
+        color: '#ffffff',
+        weight: 2,
+        fillOpacity: 0.95
+      }).addTo(map).bindPopup('<b>Current Location</b>');
+    }
+
+    function useCurrentLocation(targetField = 'origin') {
+      const input = targetField === 'origin' ? document.getElementById('originInput') : document.getElementById('destInput');
+      input.value = 'Current Location';
+
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            userLocation = {
+              lat: pos.coords.latitude,
+              lon: pos.coords.longitude
+            };
+            updateUserLocationMarker();
+            fetchRoute();
+          },
+          (err) => {
+            console.warn('Geolocation error:', err.message);
+            if (targetField === 'origin' && input.value === 'Current Location') {
+              input.value = 'Home';
+            }
+            fetchRoute();
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+        );
+      } else {
+        if (targetField === 'origin') input.value = 'Home';
+        fetchRoute();
+      }
+    }
+
+    // Format times into standard 12-hour Eastern civilian time with AM/PM (no military time)
     function fmtTime(dt) {
       if (!dt || typeof dt.time === 'undefined') return '';
-      const mins = dt.time;
-      const h = Math.floor(mins / 60) % 24;
+      const mins = typeof dt.time === 'number' ? dt.time : (dt.time.0 || 0);
+      let h = Math.floor(mins / 60) % 24;
       const m = mins % 60;
-      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      if (h === 0) h = 12;
+      return `${h}:${String(m).padStart(2, '0')} ${ampm}`;
     }
 
     function fmtDuration(mins, compact = false) {
@@ -371,12 +433,53 @@
     }
 
     async function fetchRoute() {
-      const orig = document.getElementById('originInput').value.trim();
-      const dest = document.getElementById('destInput').value.trim();
+      let orig = document.getElementById('originInput').value.trim();
+      let dest = document.getElementById('destInput').value.trim();
       if (!orig || !dest) return;
 
       // Update collapsed summary
       document.getElementById('collapsedSummaryText').textContent = `${orig} → ${dest}`;
+
+      const isOrigCurrent = orig.toLowerCase() === 'current location' || orig.toLowerCase() === 'my location';
+      const isDestCurrent = dest.toLowerCase() === 'current location' || dest.toLowerCase() === 'my location';
+
+      if ((isOrigCurrent || isDestCurrent) && !userLocation) {
+        if ('geolocation' in navigator) {
+          document.getElementById('itineraryContainer').innerHTML = `
+            <div class="text-center py-12 text-zinc-400 font-mono text-xs flex flex-col items-center gap-2">
+              <span class="text-lg animate-bounce">📍</span>
+              <span class="animate-pulse">Acquiring current GPS location...</span>
+            </div>
+          `;
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              userLocation = {
+                lat: pos.coords.latitude,
+                lon: pos.coords.longitude
+              };
+              updateUserLocationMarker();
+              fetchRoute();
+            },
+            (err) => {
+              console.warn('Geolocation unavailable/denied:', err.message);
+              if (isOrigCurrent) document.getElementById('originInput').value = 'Home';
+              if (isDestCurrent) document.getElementById('destInput').value = 'Vital LES';
+              fetchRoute();
+            },
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+          );
+          return;
+        } else {
+          if (isOrigCurrent) {
+            document.getElementById('originInput').value = 'Home';
+            orig = 'Home';
+          }
+          if (isDestCurrent) {
+            document.getElementById('destInput').value = 'Vital LES';
+            dest = 'Vital LES';
+          }
+        }
+      }
 
       // Clear previous route stats, duration, and map layers while loading
       document.getElementById('statsPanel').classList.add('hidden');
@@ -406,7 +509,24 @@
       if (activeModes.mta) modesList.push('mta');
       if (activeModes.hblr) modesList.push('hblr');
 
-      const url = `/api/route?origin=${encodeURIComponent(orig)}&destination=${encodeURIComponent(dest)}&modes=${modesList.join(',')}`;
+      let queryParts = [`modes=${modesList.join(',')}`];
+      if (isOrigCurrent && userLocation) {
+        queryParts.push(`origin_lat=${userLocation.lat}`);
+        queryParts.push(`origin_lon=${userLocation.lon}`);
+        queryParts.push(`origin=Current+Location`);
+      } else {
+        queryParts.push(`origin=${encodeURIComponent(orig)}`);
+      }
+
+      if (isDestCurrent && userLocation) {
+        queryParts.push(`dest_lat=${userLocation.lat}`);
+        queryParts.push(`dest_lon=${userLocation.lon}`);
+        queryParts.push(`destination=Current+Location`);
+      } else {
+        queryParts.push(`destination=${encodeURIComponent(dest)}`);
+      }
+
+      const url = `/api/route?${queryParts.join('&')}`;
 
       try {
         const res = await fetch(url);
@@ -478,8 +598,10 @@
           color = '#71717a';
           fromCoords = [leg.Walk.from.coords?.lat || leg.Walk.from.Point?.lat || leg.Walk.from.Station?.coords.lat, leg.Walk.from.coords?.lon || leg.Walk.from.Point?.lon || leg.Walk.from.Station?.coords.lon];
           toCoords = [leg.Walk.to.coords?.lat || leg.Walk.to.Point?.lat || leg.Walk.to.Station?.coords.lat, leg.Walk.to.coords?.lon || leg.Walk.to.Point?.lon || leg.Walk.to.Station?.coords.lon];
-          fromName = leg.Walk.from.name || leg.Walk.from.Station?.name || 'Origin';
-          toName = leg.Walk.to.name || leg.Walk.to.Station?.name || 'Destination';
+          const isOrigCurrent = document.getElementById('originInput').value.toLowerCase().includes('location');
+          const isDestCurrent = document.getElementById('destInput').value.toLowerCase().includes('location');
+          fromName = (i === 0 && isOrigCurrent) ? 'Current Location' : (leg.Walk.from.name || leg.Walk.from.Station?.name || 'Origin');
+          toName = (i === plan.legs.length - 1 && isDestCurrent) ? 'Current Location' : (leg.Walk.to.name || leg.Walk.to.Station?.name || 'Destination');
           depTime = leg.Walk.departure_time;
           arrTime = leg.Walk.arrival_time;
           label = `Walk (${leg.Walk.distance_miles.toFixed(2)} mi)`;
@@ -604,6 +726,11 @@
         }
         container.appendChild(card);
       });
+
+      if (userLocation && (document.getElementById('originInput').value.toLowerCase().includes('location') || document.getElementById('destInput').value.toLowerCase().includes('location'))) {
+        latlngs.push([userLocation.lat, userLocation.lon]);
+        updateUserLocationMarker();
+      }
 
       if (latlngs.length > 0) {
         map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50] });
