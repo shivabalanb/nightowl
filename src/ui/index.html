@@ -21,7 +21,12 @@
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     .safe-top {
-      padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
+      padding-top: 14px;
+    }
+    @media (max-width: 767px) {
+      .safe-top {
+        padding-top: calc(max(env(safe-area-inset-top, 0px), 24px) + 36px);
+      }
     }
     .safe-bottom {
       padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
