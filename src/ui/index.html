@@ -111,7 +111,7 @@
             <div class="flex items-center gap-1.5 px-2 py-1 bg-zinc-900/60 rounded focus-within:bg-zinc-900 transition-colors">
               <span class="text-zinc-500 text-[10px] uppercase font-bold shrink-0 w-8">FROM</span>
               <button type="button" onclick="useCurrentLocation()" title="Use Current GPS Location" class="text-blue-400 hover:text-blue-300 text-xs px-0.5 py-0.5 rounded hover:bg-zinc-800 transition-colors shrink-0">📍</button>
-              <input id="originInput" onfocus="lastFocusedInput='origin'" onkeydown="if(event.key==='Enter') fetchRoute()" type="text" placeholder="Address, station, or GPS" class="bg-transparent border-none outline-none w-full text-zinc-200 text-xs placeholder:text-zinc-600" value="Current Location" />
+              <input id="originInput" onfocus="lastFocusedInput='origin'" onkeydown="if(event.key==='Enter') fetchRoute()" type="text" placeholder="Address, station, or GPS" class="bg-transparent border-none outline-none w-full text-zinc-200 text-xs placeholder:text-zinc-600" value="Home" />
               <select onchange="if(this.value==='__CURRENT__'){useCurrentLocation();}else if(this.value){document.getElementById('originInput').value=this.value; this.value=''; fetchRoute();}" class="bg-zinc-800 text-zinc-400 border border-zinc-700/60 rounded text-[9px] px-1 py-0.5 outline-none hover:text-zinc-200 cursor-pointer shrink-0">
                 <option value="">Saved</option>
                 <option value="__CURRENT__">📍 Current Location</option>
@@ -376,7 +376,7 @@
     // Format times into standard 12-hour Eastern civilian time with AM/PM (no military time)
     function fmtTime(dt) {
       if (!dt || typeof dt.time === 'undefined') return '';
-      const mins = typeof dt.time === 'number' ? dt.time : (dt.time.0 || 0);
+      const mins = typeof dt.time === 'number' ? dt.time : (typeof dt.time === 'object' && dt.time ? (dt.time[0] || dt.time.mins || 0) : 0);
       let h = Math.floor(mins / 60) % 24;
       const m = mins % 60;
       const ampm = h >= 12 ? 'PM' : 'AM';
@@ -735,6 +735,28 @@
       if (latlngs.length > 0) {
         map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50] });
       }
+    }
+
+    // Prompt or check for location services on startup
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          userLocation = {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude
+          };
+          const orig = document.getElementById('originInput');
+          if (orig && (orig.value === 'Home' || orig.value === 'Current Location')) {
+            orig.value = 'Current Location';
+            updateUserLocationMarker();
+            fetchRoute();
+          }
+        },
+        (err) => {
+          console.log('Location services not available or denied on startup:', err.message);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      );
     }
 
     fetchRoute();
