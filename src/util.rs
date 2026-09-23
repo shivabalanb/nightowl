@@ -66,6 +66,10 @@ impl Date {
         }
     }
 
+    pub fn to_naive_date(&self) -> Option<chrono::NaiveDate> {
+        chrono::NaiveDate::from_ymd_opt(self.year as i32, self.month, self.day)
+    }
+
     /// Next calendar day
     pub fn next_day(&self) -> Self {
         let days_in_month = match self.month {
@@ -199,8 +203,36 @@ impl Default for DateTime {
 }
 
 impl DateTime {
-    pub fn new(date: Date, time: Time) -> Self {
-        Self { date, time }
+    pub fn new(mut date: Date, time: Time) -> Self {
+        let total_mins = time.as_minutes();
+        let days_to_add = total_mins / 1440;
+        let rem_mins = total_mins % 1440;
+        for _ in 0..days_to_add {
+            date = date.next_day();
+        }
+        Self {
+            date,
+            time: Time::from_minutes(rem_mins),
+        }
+    }
+
+    /// Returns the non-negative duration in minutes from `self` to `later`.
+    /// Correctly accounts for midnight crossings and calendar day differences.
+    pub fn duration_minutes_to(&self, later: &DateTime) -> u32 {
+        if let (Some(d1), Some(d2)) = (self.date.to_naive_date(), later.date.to_naive_date()) {
+            let days_diff = (d2 - d1).num_days();
+            let total_mins = days_diff * 1440 + (later.time.as_minutes() as i64) - (self.time.as_minutes() as i64);
+            if total_mins > 0 {
+                total_mins as u32
+            } else {
+                0
+            }
+        } else if later.time >= self.time {
+            later.time.as_minutes() - self.time.as_minutes()
+        } else {
+            // Assume 1-day midnight rollover if date parsing is unavailable
+            later.time.as_minutes() + 1440 - self.time.as_minutes()
+        }
     }
 
     pub fn now() -> Self {
@@ -635,5 +667,34 @@ mod tests {
         assert!(now.date.day >= 1 && now.date.day <= 31);
         assert!(now.time.as_minutes() < 1440);
     }
+
+    #[test]
+    fn test_datetime_duration_minutes_midnight_rollover() {
+        let date = Date::new(2026, 9, 22);
+        // 11:58 PM (1438 minutes)
+        let dt1 = DateTime::new(date, Time::from_minutes(23 * 60 + 58));
+        // 1:01 AM next day (61 minutes)
+        let dt2 = DateTime::new(date.next_day(), Time::from_minutes(1 * 60 + 1));
+
+        assert_eq!(dt1.duration_minutes_to(&dt2), 63);
+    }
+
+    #[test]
+    fn test_datetime_new_minute_overflow_normalization() {
+        let date = Date::new(2026, 9, 22);
+        // 24:15 in GTFS format (1455 minutes)
+        let dt = DateTime::new(date, Time::from_minutes(24 * 60 + 15));
+        assert_eq!(dt.date, date.next_day());
+        assert_eq!(dt.time, Time::from_minutes(15));
+    }
+
+    #[test]
+    fn test_datetime_duration_minutes_same_day() {
+        let date = Date::new(2026, 9, 23);
+        let dt1 = DateTime::new(date, Time::from_minutes(10));
+        let dt2 = DateTime::new(date, Time::from_minutes(45));
+        assert_eq!(dt1.duration_minutes_to(&dt2), 35);
+    }
 }
+
 

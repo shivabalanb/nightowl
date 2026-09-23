@@ -380,6 +380,22 @@
       return m === 0 ? `${h} ${hrWord}` : `${h} ${hrWord} ${m} mins`;
     }
 
+    function calcDurationMins(depDt, arrDt) {
+      if (!depDt || !arrDt) return 0;
+      const depMins = typeof depDt.time === 'number' ? depDt.time : (typeof depDt.time === 'object' && depDt.time ? (depDt.time[0] || depDt.time.mins || 0) : 0);
+      const arrMins = typeof arrDt.time === 'number' ? arrDt.time : (typeof arrDt.time === 'object' && arrDt.time ? (arrDt.time[0] || arrDt.time.mins || 0) : 0);
+      let diff = arrMins - depMins;
+      if (depDt.date && arrDt.date && typeof depDt.date.year === 'number' && typeof arrDt.date.year === 'number') {
+        const d1 = new Date(depDt.date.year, depDt.date.month - 1, depDt.date.day);
+        const d2 = new Date(arrDt.date.year, arrDt.date.month - 1, arrDt.date.day);
+        const dayDiff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+        diff += dayDiff * 1440;
+      } else if (diff < 0) {
+        diff += 1440;
+      }
+      return Math.max(0, diff);
+    }
+
     function toggleMode(mode) {
       activeModes[mode] = !activeModes[mode];
       const btn = document.getElementById(`mode-${mode}`);
@@ -737,8 +753,12 @@
       }
 
       if (stats) {
+        const totalDurationMins = (typeof stats.total_duration_mins === 'number' && stats.total_duration_mins > 0)
+          ? stats.total_duration_mins
+          : ((stats.walk_mins || 0) + (stats.bike_mins || 0) + (stats.transit_mins || 0) + (stats.wait_mins || 0));
+
         document.getElementById('statsPanel').classList.remove('hidden');
-        document.getElementById('statDuration').textContent = fmtDuration(stats.total_duration_mins);
+        document.getElementById('statDuration').textContent = fmtDuration(totalDurationMins);
         document.getElementById('statArrival').textContent = arrivalTimeStr || '--';
         document.getElementById('statWalk').textContent = fmtDuration(stats.walk_mins, true);
         document.getElementById('statBike').textContent = fmtDuration(stats.bike_mins, true);
@@ -747,7 +767,7 @@
 
         // Mobile Stats Bar
         document.getElementById('mobileStatsBar').classList.remove('hidden');
-        document.getElementById('mobileStatDuration').textContent = fmtDuration(stats.total_duration_mins);
+        document.getElementById('mobileStatDuration').textContent = fmtDuration(totalDurationMins);
         document.getElementById('mobileStatArrival').textContent = arrivalTimeStr || '--';
         document.getElementById('mobileStatWalk').textContent = fmtDuration(stats.walk_mins, true);
         document.getElementById('mobileStatBike').textContent = fmtDuration(stats.bike_mins, true);
@@ -837,9 +857,7 @@
           routeLayers.push(marker);
         }
 
-        const durationMins = (arrTime && depTime && typeof arrTime.time === 'number' && typeof depTime.time === 'number')
-          ? arrTime.time.saturating_sub ? arrTime.time.saturating_sub(depTime.time) : Math.max(0, arrTime.time - depTime.time)
-          : 0;
+        const durationMins = calcDurationMins(depTime, arrTime);
 
         let navBtn = '';
         if (fromCoords && toCoords && fromCoords[0] && toCoords[0]) {
