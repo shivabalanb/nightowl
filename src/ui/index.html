@@ -94,70 +94,29 @@
           </button>
         </div>
         
-        <!-- Saved Places Single Row -->
-        <div class="flex gap-1.5 overflow-x-auto no-scrollbar text-[10px] font-mono text-zinc-400 items-center">
-          <button onclick="useCurrentLocation()" id="btnCurrentLoc" class="px-2.5 py-1 rounded-md bg-blue-950/80 hover:bg-blue-900 text-blue-300 border border-blue-700/70 whitespace-nowrap transition-all flex items-center gap-1 font-semibold shadow-sm">
-            <span class="text-xs">📍</span>
-            <span>Current Location</span>
-          </button>
-          <button onclick="applySavedPlace('Home')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">Home</button>
-          <button onclick="applySavedPlace('Work')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">Work</button>
-          <button onclick="applySavedPlace('Vital LES')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">Vital LES</button>
-          <button onclick="applySavedPlace('Vital Brooklyn')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">Vital BK</button>
-          <button onclick="applySavedPlace('WTC')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">WTC</button>
-          <button onclick="applySavedPlace('Hoboken')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">Hoboken</button>
-          <button onclick="applySavedPlace('Exchange Pl')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 whitespace-nowrap transition-all">Exchange Pl</button>
-        </div>
-
-        <!-- Unified Compact Inputs Card with Zero-Overlap Swap -->
-        <div class="flex items-center gap-1.5 bg-zinc-950 rounded-lg border border-zinc-800 p-1.5 text-xs font-mono">
+        <!-- Unified Clean Inputs Card with Swap and Seamless Autocomplete -->
+        <div class="relative flex items-center gap-1.5 bg-zinc-950 rounded-lg border border-zinc-800 p-1.5 text-xs font-mono">
           <div class="flex-1 space-y-1">
             <!-- Origin -->
-            <div class="flex items-center gap-1.5 px-2 py-1 bg-zinc-900/60 rounded focus-within:bg-zinc-900 transition-colors">
+            <div class="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-900/60 rounded focus-within:bg-zinc-900 transition-colors">
               <span class="text-zinc-500 text-[10px] uppercase font-bold shrink-0 w-8">FROM</span>
-              <button type="button" onclick="useCurrentLocation()" title="Use Current GPS Location" class="text-blue-400 hover:text-blue-300 text-xs px-0.5 py-0.5 rounded hover:bg-zinc-800 transition-colors shrink-0">📍</button>
-              <input id="originInput" onfocus="lastFocusedInput='origin'" onkeydown="if(event.key==='Enter') fetchRoute()" type="text" placeholder="Address, station, or GPS" class="bg-transparent border-none outline-none w-full text-zinc-200 text-xs placeholder:text-zinc-600" value="Home" />
-              <select onchange="if(this.value==='__CURRENT__'){useCurrentLocation();}else if(this.value){document.getElementById('originInput').value=this.value; this.value=''; fetchRoute();}" class="bg-zinc-800 text-zinc-400 border border-zinc-700/60 rounded text-[9px] px-1 py-0.5 outline-none hover:text-zinc-200 cursor-pointer shrink-0">
-                <option value="">Saved</option>
-                <option value="__CURRENT__">📍 Current Location</option>
-                <option value="Home">Home</option>
-                <option value="Work">Work</option>
-                <option value="Vital LES">Vital LES</option>
-                <option value="Vital Brooklyn">Vital BK</option>
-                <option value="WTC">WTC</option>
-                <option value="Hoboken">Hoboken</option>
-                <option value="Newport">Newport</option>
-                <option value="Exchange Pl">Exchange Pl</option>
-                <option value="Grove St">Grove St</option>
-                <option value="Herald Sq">Herald Sq</option>
-              </select>
+              <input id="originInput" onfocus="lastFocusedInput='origin'; handleInputAutocomplete('origin')" oninput="handleInputAutocomplete('origin')" onkeydown="if(event.key==='Enter') { hideAutocomplete(); fetchRoute(); }" type="text" placeholder="Search saved places, address, or GPS" class="bg-transparent border-none outline-none w-full text-zinc-200 text-xs placeholder:text-zinc-600" value="Current Location" autocomplete="off" />
             </div>
 
             <!-- Destination -->
-            <div class="flex items-center gap-1.5 px-2 py-1 bg-zinc-900/60 rounded focus-within:bg-zinc-900 transition-colors">
+            <div class="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-900/60 rounded focus-within:bg-zinc-900 transition-colors">
               <span class="text-zinc-500 text-[10px] uppercase font-bold shrink-0 w-8">TO</span>
-              <input id="destInput" onfocus="lastFocusedInput='dest'" onkeydown="if(event.key==='Enter') fetchRoute()" type="text" placeholder="Address or station" class="bg-transparent border-none outline-none w-full text-zinc-200 text-xs placeholder:text-zinc-600" value="Vital LES" />
-              <select onchange="if(this.value==='__CURRENT__'){useCurrentLocation('dest');}else if(this.value){document.getElementById('destInput').value=this.value; this.value=''; fetchRoute();}" class="bg-zinc-800 text-zinc-400 border border-zinc-700/60 rounded text-[9px] px-1 py-0.5 outline-none hover:text-zinc-200 cursor-pointer shrink-0">
-                <option value="">Saved</option>
-                <option value="__CURRENT__">📍 Current Location</option>
-                <option value="Home">Home</option>
-                <option value="Work">Work</option>
-                <option value="Vital LES">Vital LES</option>
-                <option value="Vital Brooklyn">Vital BK</option>
-                <option value="WTC">WTC</option>
-                <option value="Hoboken">Hoboken</option>
-                <option value="Newport">Newport</option>
-                <option value="Exchange Pl">Exchange Pl</option>
-                <option value="Grove St">Grove St</option>
-                <option value="Herald Sq">Herald Sq</option>
-              </select>
+              <input id="destInput" onfocus="lastFocusedInput='dest'; handleInputAutocomplete('dest')" oninput="handleInputAutocomplete('dest')" onkeydown="if(event.key==='Enter') { hideAutocomplete(); fetchRoute(); }" type="text" placeholder="Search saved places or address" class="bg-transparent border-none outline-none w-full text-zinc-200 text-xs placeholder:text-zinc-600" value="Vital LES" autocomplete="off" />
             </div>
           </div>
 
           <!-- Dedicated Right-Hand Swap Button Column -->
-          <button onclick="swapLocations()" title="Swap Origin & Destination" class="h-14 w-6 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 border border-zinc-800 text-[11px] font-mono flex items-center justify-center transition-all shrink-0 active:scale-95">
+          <button onclick="swapLocations()" title="Swap Origin & Destination" class="h-16 w-7 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 border border-zinc-800 text-[11px] font-mono flex items-center justify-center transition-all shrink-0 active:scale-95">
             ⇅
           </button>
+
+          <!-- Autocomplete Dropdown List -->
+          <div id="autocompleteDropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-zinc-900/95 backdrop-blur-md border border-zinc-700/80 rounded-lg shadow-2xl z-50 overflow-hidden divide-y divide-zinc-800/80 font-mono text-xs max-h-72 overflow-y-auto"></div>
         </div>
 
         <!-- Mode Toggles & Search Row -->
@@ -184,10 +143,16 @@
       </div>
 
       <!-- Mobile Inline Stats Bar (Visible on mobile Route view) -->
-      <div id="mobileStatsBar" class="hidden md:hidden px-4 py-3.5 bg-zinc-950/95 border-b border-zinc-800/80 flex items-center justify-between text-xs font-mono shrink-0">
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span id="mobileStatDuration" class="text-white font-black text-lg tracking-tight">--</span>
+      <div id="mobileStatsBar" class="hidden md:hidden px-4 py-3 bg-zinc-950/95 border-b border-zinc-800/80 flex items-center justify-between text-xs font-mono shrink-0">
+        <div class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="mobileStatDuration" class="text-white font-black text-base tracking-tight">--</span>
+          </div>
+          <div class="flex items-center gap-1 pl-4 text-[11px]">
+            <span class="text-zinc-500">Arrive:</span>
+            <span id="mobileStatArrival" class="text-emerald-400 font-bold">--</span>
+          </div>
         </div>
         <div class="flex items-center gap-3 text-zinc-400 text-xs">
           <span class="flex items-center gap-1" title="Walk"><span class="text-sm">🚶</span><span id="mobileStatWalk" class="text-zinc-200 font-bold">--</span></span>
@@ -218,10 +183,16 @@
 
       <!-- Floating Duration & Stats Card on Top Right of Map -->
       <div id="statsPanel" class="absolute top-4 right-4 z-[1000] hidden bg-zinc-900/90 backdrop-blur-md border border-zinc-800 rounded-xl shadow-2xl p-3.5 space-y-2.5 font-mono min-w-[260px] sm:min-w-[280px] max-w-[calc(100vw-32px)] pointer-events-auto">
-        <div class="flex items-center justify-between gap-6 px-1">
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span class="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Total Duration</span>
+        <div class="flex items-center justify-between gap-4 px-1">
+          <div class="flex flex-col gap-0.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Total Duration</span>
+            </div>
+            <div class="text-[11px] font-mono pl-4 flex items-center gap-1.5">
+              <span class="text-zinc-500">Arrive:</span>
+              <span id="statArrival" class="font-bold text-emerald-400 text-xs">--</span>
+            </div>
           </div>
           <span id="statDuration" class="text-2xl font-black text-white tracking-tight shrink-0">--</span>
         </div>
@@ -349,7 +320,7 @@
       }).addTo(map).bindPopup('<b>Current Location</b>');
     }
 
-    function useCurrentLocation(targetField = 'origin') {
+    function useCurrentLocation(targetField = 'origin', triggerRoute = false) {
       const input = targetField === 'origin' ? document.getElementById('originInput') : document.getElementById('destInput');
       input.value = 'Current Location';
 
@@ -360,21 +331,26 @@
               lat: pos.coords.latitude,
               lon: pos.coords.longitude
             };
+            resolvedCoords[targetField] = {
+              text: 'Current Location',
+              lat: pos.coords.latitude,
+              lon: pos.coords.longitude
+            };
             updateUserLocationMarker();
-            fetchRoute();
+            if (triggerRoute) fetchRoute();
           },
           (err) => {
             console.warn('Geolocation error:', err.message);
             if (targetField === 'origin' && input.value === 'Current Location') {
               input.value = 'Home';
             }
-            fetchRoute();
+            if (triggerRoute) fetchRoute();
           },
           { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
         );
       } else {
         if (targetField === 'origin') input.value = 'Home';
-        fetchRoute();
+        if (triggerRoute) fetchRoute();
       }
     }
 
@@ -420,13 +396,164 @@
       fetchRoute();
     }
 
-    function applySavedPlace(place) {
-      if (lastFocusedInput === 'origin') {
-        document.getElementById('originInput').value = place;
-      } else {
-        document.getElementById('destInput').value = place;
+    const SAVED_PLACES = [
+      { name: 'Current Location', subtitle: 'Your GPS position', isCurrent: true, keywords: ['current', 'location', 'gps', 'here', 'my location'] },
+      { name: 'Home', subtitle: 'Apartment', lat: 40.72204775835277, lon: -74.0368774356056, keywords: ['home', 'apartment', 'house'] },
+      { name: 'Work', subtitle: 'Office (Midtown)', lat: 40.749719, lon: -73.987823, keywords: ['work', 'office', 'job'] },
+      { name: 'Vital LES', subtitle: '182 Broome St, Lower East Side', lat: 40.71721004390394, lon: -73.98642630279129, keywords: ['vital', 'vital les', 'les', 'climbing', 'bouldering'] },
+      { name: 'Vital Brooklyn', subtitle: '221 N 14th St, Williamsburg', lat: 40.721867, lon: -73.958742, keywords: ['vital brooklyn', 'vital bk', 'vital williamsburg', 'williamsburg'] },
+      { name: 'Movement LIC', subtitle: '11-11 44th Dr, Long Island City', lat: 40.748631, lon: -73.948795, keywords: ['movement', 'movement lic', 'lic', 'climbing'] },
+      { name: 'WTC', subtitle: 'World Trade Center / Oculus', lat: 40.712582, lon: -74.009781, keywords: ['wtc', 'world trade center', 'oculus', 'financial district'] },
+      { name: 'Hoboken', subtitle: 'Hoboken Terminal', lat: 40.7350, lon: -74.0290, keywords: ['hoboken', 'terminal', 'path'] },
+      { name: 'Newport', subtitle: 'Newport PATH', lat: 40.7270, lon: -74.0346, keywords: ['newport', 'mall', 'path'] },
+      { name: 'Exchange Pl', subtitle: 'Exchange Place PATH', lat: 40.71676, lon: -74.03238, keywords: ['exchange', 'exchange pl', 'path'] },
+      { name: 'Grove St', subtitle: 'Grove Street PATH', lat: 40.7196, lon: -74.0431, keywords: ['grove', 'grove st', 'path'] },
+    ];
+
+    let resolvedCoords = { origin: null, dest: null };
+    let autocompleteTimeout = null;
+
+    function hideAutocomplete() {
+      const dropdown = document.getElementById('autocompleteDropdown');
+      if (dropdown) {
+        dropdown.classList.add('hidden');
+        dropdown.innerHTML = '';
       }
-      fetchRoute();
+    }
+
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('autocompleteDropdown');
+      if (dropdown && !dropdown.contains(e.target) && e.target.id !== 'originInput' && e.target.id !== 'destInput') {
+        hideAutocomplete();
+      }
+    });
+
+    function findSavedPlace(text) {
+      if (!text) return null;
+      const q = text.toLowerCase().trim();
+      return SAVED_PLACES.find(p => p.name.toLowerCase() === q || (p.keywords && p.keywords.includes(q)));
+    }
+
+    function getMatchingSavedPlaces(query) {
+      if (!query) return SAVED_PLACES.slice(0, 6);
+      const q = query.toLowerCase().trim();
+      return SAVED_PLACES.filter(p => {
+        if (p.name.toLowerCase().includes(q)) return true;
+        if (p.subtitle && p.subtitle.toLowerCase().includes(q)) return true;
+        return p.keywords && p.keywords.some(k => k.includes(q) || q.includes(k));
+      });
+    }
+
+    async function handleInputAutocomplete(targetField) {
+      const input = targetField === 'origin' ? document.getElementById('originInput') : document.getElementById('destInput');
+      const val = input.value.trim();
+      const dropdown = document.getElementById('autocompleteDropdown');
+      clearTimeout(autocompleteTimeout);
+
+      if (resolvedCoords[targetField] && resolvedCoords[targetField].text !== val) {
+        resolvedCoords[targetField] = null;
+      }
+
+      const matchingSaved = getMatchingSavedPlaces(val);
+
+      const renderSuggestions = (savedList, externalFeatures = []) => {
+        dropdown.innerHTML = '';
+
+        savedList.forEach(p => {
+          const item = document.createElement('div');
+          item.className = 'px-3 py-2 hover:bg-zinc-800 cursor-pointer flex flex-col gap-0.5 transition-colors text-left bg-zinc-900/40';
+          item.innerHTML = `
+            <div class="font-medium text-zinc-100 flex items-center justify-between">
+              <span class="truncate">${p.name}</span>
+              <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-950/80 text-blue-300 border border-blue-800/60 font-semibold uppercase">Saved</span>
+            </div>
+            ${p.subtitle ? `<div class="text-[10px] text-zinc-400 truncate">${p.subtitle}</div>` : ''}
+          `;
+
+          item.onmousedown = (e) => {
+            e.preventDefault();
+            if (p.isCurrent) {
+              useCurrentLocation(targetField, false);
+            } else {
+              input.value = p.name;
+              resolvedCoords[targetField] = {
+                text: p.name,
+                lat: p.lat,
+                lon: p.lon
+              };
+            }
+            hideAutocomplete();
+            if (targetField === 'origin') {
+              document.getElementById('destInput').focus();
+            }
+          };
+          dropdown.appendChild(item);
+        });
+
+        externalFeatures.forEach(feat => {
+          const props = feat.properties || {};
+          const coords = feat.geometry?.coordinates;
+          if (!coords || coords.length < 2) return;
+
+          const name = props.name || [props.housenumber, props.street].filter(Boolean).join(' ') || val;
+          if (savedList.some(s => s.name.toLowerCase() === name.toLowerCase())) return;
+
+          const subtitleParts = [
+            props.name ? [props.housenumber, props.street].filter(Boolean).join(' ') : null,
+            props.locality || props.district || props.city,
+            props.state
+          ].filter(Boolean);
+          const subtitle = subtitleParts.join(', ');
+
+          const item = document.createElement('div');
+          item.className = 'px-3 py-2 hover:bg-zinc-800 cursor-pointer flex flex-col gap-0.5 transition-colors text-left';
+          item.innerHTML = `
+            <div class="font-medium text-zinc-100 flex items-center justify-between">
+              <span class="truncate">${name}</span>
+              <span class="text-[9px] text-zinc-500 uppercase">${props.osm_value || props.type || 'place'}</span>
+            </div>
+            ${subtitle ? `<div class="text-[10px] text-zinc-400 truncate">${subtitle}</div>` : ''}
+          `;
+
+          item.onmousedown = (e) => {
+            e.preventDefault();
+            input.value = name;
+            resolvedCoords[targetField] = {
+              text: name,
+              lat: coords[1],
+              lon: coords[0]
+            };
+            hideAutocomplete();
+            if (targetField === 'origin') {
+              document.getElementById('destInput').focus();
+            }
+          };
+          dropdown.appendChild(item);
+        });
+
+        if (dropdown.children.length > 0) {
+          dropdown.classList.remove('hidden');
+        } else {
+          hideAutocomplete();
+        }
+      };
+
+      // Immediately render saved places
+      renderSuggestions(matchingSaved, []);
+
+      // If typed at least 2 characters, search external POIs & addresses with regional bias
+      if (val.length >= 2) {
+        autocompleteTimeout = setTimeout(async () => {
+          try {
+            const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(val)}&limit=5&lat=40.73&lon=-73.95`);
+            if (!res.ok) return;
+            const data = await res.json();
+            renderSuggestions(matchingSaved, data.features || []);
+          } catch (err) {
+            console.warn('Photon autocomplete failed:', err);
+          }
+        }, 200);
+      }
     }
 
     function swapLocations() {
@@ -434,7 +561,10 @@
       const dest = document.getElementById('destInput').value;
       document.getElementById('originInput').value = dest;
       document.getElementById('destInput').value = orig;
-      fetchRoute();
+      const tmp = resolvedCoords.origin;
+      resolvedCoords.origin = resolvedCoords.dest;
+      resolvedCoords.dest = tmp;
+      hideAutocomplete();
     }
 
     async function fetchRoute() {
@@ -451,8 +581,8 @@
       if ((isOrigCurrent || isDestCurrent) && !userLocation) {
         if ('geolocation' in navigator) {
           document.getElementById('itineraryContainer').innerHTML = `
-            <div class="text-center py-12 text-zinc-400 font-mono text-xs flex flex-col items-center gap-2">
-              <span class="text-lg animate-bounce">📍</span>
+            <div class="text-center py-12 text-zinc-400 font-mono text-xs flex flex-col items-center gap-3">
+              <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               <span class="animate-pulse">Acquiring current GPS location...</span>
             </div>
           `;
@@ -490,11 +620,13 @@
       document.getElementById('statsPanel').classList.add('hidden');
       document.getElementById('mobileStatsBar').classList.add('hidden');
       document.getElementById('statDuration').textContent = '--';
+      document.getElementById('statArrival').textContent = '--';
       document.getElementById('statWalk').textContent = '--';
       document.getElementById('statBike').textContent = '--';
       document.getElementById('statTransit').textContent = '--';
       document.getElementById('statWait').textContent = '--';
       document.getElementById('mobileStatDuration').textContent = '--';
+      document.getElementById('mobileStatArrival').textContent = '--';
       document.getElementById('mobileStatWalk').textContent = '--';
       document.getElementById('mobileStatBike').textContent = '--';
       document.getElementById('mobileStatTransit').textContent = '--';
@@ -514,11 +646,29 @@
       if (activeModes.mta) modesList.push('mta');
       if (activeModes.hblr) modesList.push('hblr');
 
+      // If not already resolved by click, auto-resolve matching saved place
+      if (!isOrigCurrent && (!resolvedCoords.origin || resolvedCoords.origin.text !== orig)) {
+        const saved = findSavedPlace(orig);
+        if (saved && !saved.isCurrent) {
+          resolvedCoords.origin = { text: orig, lat: saved.lat, lon: saved.lon };
+        }
+      }
+      if (!isDestCurrent && (!resolvedCoords.dest || resolvedCoords.dest.text !== dest)) {
+        const saved = findSavedPlace(dest);
+        if (saved && !saved.isCurrent) {
+          resolvedCoords.dest = { text: dest, lat: saved.lat, lon: saved.lon };
+        }
+      }
+
       let queryParts = [`modes=${modesList.join(',')}`];
       if (isOrigCurrent && userLocation) {
         queryParts.push(`origin_lat=${userLocation.lat}`);
         queryParts.push(`origin_lon=${userLocation.lon}`);
         queryParts.push(`origin=Current+Location`);
+      } else if (resolvedCoords.origin && resolvedCoords.origin.text === orig) {
+        queryParts.push(`origin_lat=${resolvedCoords.origin.lat}`);
+        queryParts.push(`origin_lon=${resolvedCoords.origin.lon}`);
+        queryParts.push(`origin=${encodeURIComponent(orig)}`);
       } else {
         queryParts.push(`origin=${encodeURIComponent(orig)}`);
       }
@@ -527,6 +677,10 @@
         queryParts.push(`dest_lat=${userLocation.lat}`);
         queryParts.push(`dest_lon=${userLocation.lon}`);
         queryParts.push(`destination=Current+Location`);
+      } else if (resolvedCoords.dest && resolvedCoords.dest.text === dest) {
+        queryParts.push(`dest_lat=${resolvedCoords.dest.lat}`);
+        queryParts.push(`dest_lon=${resolvedCoords.dest.lon}`);
+        queryParts.push(`destination=${encodeURIComponent(dest)}`);
       } else {
         queryParts.push(`destination=${encodeURIComponent(dest)}`);
       }
@@ -564,9 +718,28 @@
       routeLayers.forEach(l => map.removeLayer(l));
       routeLayers = [];
 
+      let arrivalTimeStr = '';
+      if (plan.arrival_time) {
+        arrivalTimeStr = fmtTime(plan.arrival_time);
+      } else if (plan.legs && plan.legs.length > 0) {
+        const lastLeg = plan.legs[plan.legs.length - 1];
+        const lastArr = lastLeg.Walk?.arrival_time || lastLeg.Bike?.arrival_time || lastLeg.Transit?.arrival_time;
+        if (lastArr) arrivalTimeStr = fmtTime(lastArr);
+      }
+
+      let depTimeStr = '';
+      if (plan.departure_time) {
+        depTimeStr = fmtTime(plan.departure_time);
+      } else if (plan.legs && plan.legs.length > 0) {
+        const firstLeg = plan.legs[0];
+        const firstDep = firstLeg.Walk?.departure_time || firstLeg.Bike?.departure_time || firstLeg.Transit?.departure_time;
+        if (firstDep) depTimeStr = fmtTime(firstDep);
+      }
+
       if (stats) {
         document.getElementById('statsPanel').classList.remove('hidden');
         document.getElementById('statDuration').textContent = fmtDuration(stats.total_duration_mins);
+        document.getElementById('statArrival').textContent = arrivalTimeStr || '--';
         document.getElementById('statWalk').textContent = fmtDuration(stats.walk_mins, true);
         document.getElementById('statBike').textContent = fmtDuration(stats.bike_mins, true);
         document.getElementById('statTransit').textContent = fmtDuration(stats.transit_mins, true);
@@ -575,6 +748,7 @@
         // Mobile Stats Bar
         document.getElementById('mobileStatsBar').classList.remove('hidden');
         document.getElementById('mobileStatDuration').textContent = fmtDuration(stats.total_duration_mins);
+        document.getElementById('mobileStatArrival').textContent = arrivalTimeStr || '--';
         document.getElementById('mobileStatWalk').textContent = fmtDuration(stats.walk_mins, true);
         document.getElementById('mobileStatBike').textContent = fmtDuration(stats.bike_mins, true);
         document.getElementById('mobileStatTransit').textContent = fmtDuration(stats.transit_mins, true);
@@ -603,10 +777,10 @@
           color = '#71717a';
           fromCoords = [leg.Walk.from.coords?.lat || leg.Walk.from.Point?.lat || leg.Walk.from.Station?.coords.lat, leg.Walk.from.coords?.lon || leg.Walk.from.Point?.lon || leg.Walk.from.Station?.coords.lon];
           toCoords = [leg.Walk.to.coords?.lat || leg.Walk.to.Point?.lat || leg.Walk.to.Station?.coords.lat, leg.Walk.to.coords?.lon || leg.Walk.to.Point?.lon || leg.Walk.to.Station?.coords.lon];
-          const isOrigCurrent = document.getElementById('originInput').value.toLowerCase().includes('location');
-          const isDestCurrent = document.getElementById('destInput').value.toLowerCase().includes('location');
-          fromName = (i === 0 && isOrigCurrent) ? 'Current Location' : (leg.Walk.from.name || leg.Walk.from.Station?.name || 'Origin');
-          toName = (i === plan.legs.length - 1 && isDestCurrent) ? 'Current Location' : (leg.Walk.to.name || leg.Walk.to.Station?.name || 'Destination');
+          const origVal = document.getElementById('originInput').value.trim();
+          const destVal = document.getElementById('destInput').value.trim();
+          fromName = (i === 0 && origVal) ? origVal : (leg.Walk.from.name || leg.Walk.from.Station?.name || 'Origin');
+          toName = (i === plan.legs.length - 1 && destVal) ? destVal : (leg.Walk.to.name || leg.Walk.to.Station?.name || 'Destination');
           depTime = leg.Walk.departure_time;
           arrTime = leg.Walk.arrival_time;
           label = `Walk (${leg.Walk.distance_miles.toFixed(2)} mi)`;
@@ -742,28 +916,7 @@
       }
     }
 
-    // Prompt or check for location services on startup
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          userLocation = {
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude
-          };
-          const orig = document.getElementById('originInput');
-          if (orig && (orig.value === 'Home' || orig.value === 'Current Location')) {
-            orig.value = 'Current Location';
-            updateUserLocationMarker();
-            fetchRoute();
-          }
-        },
-        (err) => {
-          console.log('Location services not available or denied on startup:', err.message);
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-      );
-    }
-
+    // On startup, route from Current Location to Vital LES
     fetchRoute();
   </script>
 </body>

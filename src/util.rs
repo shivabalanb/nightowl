@@ -347,6 +347,9 @@ impl Coordinates {
             "vital brooklyn" | "vital williamsburg" | "vital bk" => {
                 return Ok(Coordinates::new(40.721867, -73.958742));
             }
+            "movement lic" | "movement lic gym" | "movement" | "movement climbing" => {
+                return Ok(Coordinates::new(40.748631, -73.948795));
+            }
             "williamsburg" => {
                 return Ok(Coordinates::new(40.7163, -73.9586));
             }
@@ -386,24 +389,37 @@ impl Coordinates {
             _ => {}
         }
 
-        // 3. Fallback to OpenStreetMap Nominatim Geocoding API bounded to NY/NJ metro
+        // 3. Fallback to Photon (OpenStreetMap geocoder by Komoot) bounded to NY/NJ metro
         let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(4))
-            .user_agent("NightowlTransitRouter/1.0")
+            .timeout(std::time::Duration::from_secs(5))
+            .user_agent("NightowlTransitRouter/1.0 (contact: support@nightowl.app)")
             .build()?;
 
         #[derive(serde::Deserialize)]
-        struct NominatimResult {
-            lat: String,
-            lon: String,
+        struct PhotonResponse {
+            features: Vec<PhotonFeature>,
         }
 
-        let url = format!(
-            "https://nominatim.openstreetmap.org/search?q={}&format=json&limit=1&viewbox=-74.3,40.9,-73.7,40.5",
-            clean.replace(' ', "+")
-        );
+        #[derive(serde::Deserialize)]
+        struct PhotonFeature {
+            geometry: PhotonGeometry,
+        }
 
-        let response = match client.get(&url).send() {
+        #[derive(serde::Deserialize)]
+        struct PhotonGeometry {
+            coordinates: Vec<f64>, // [lon, lat]
+        }
+
+        let response = match client
+            .get("https://photon.komoot.io/api/")
+            .query(&[
+                ("q", clean),
+                ("limit", "1"),
+                ("lat", "40.73"),
+                ("lon", "-73.95"),
+            ])
+            .send()
+        {
             Ok(resp) => resp,
             Err(_) => {
                 return Err(format!(
@@ -414,9 +430,11 @@ impl Coordinates {
             }
         };
 
-        if let Ok(res) = response.json::<Vec<NominatimResult>>() {
-            if let Some(first) = res.first() {
-                if let (Ok(lat), Ok(lon)) = (first.lat.parse::<f64>(), first.lon.parse::<f64>()) {
+        if let Ok(res) = response.json::<PhotonResponse>() {
+            if let Some(first) = res.features.first() {
+                if first.geometry.coordinates.len() >= 2 {
+                    let lon = first.geometry.coordinates[0];
+                    let lat = first.geometry.coordinates[1];
                     return Ok(Coordinates::new(lat, lon));
                 }
             }

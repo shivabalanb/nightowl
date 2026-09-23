@@ -444,8 +444,21 @@ impl<'a> SearchContext<'a> {
 
         best_times.insert(query.origin.clone(), departure_time);
         if bike.can_bike_between(&query.origin, &query.destination) {
-            let direct_walk = departure_time + query.origin.walk_duration(&query.destination);
+            let dist_miles = query.origin.walk_miles(&query.destination);
+            let walk_time = query.origin.walk_duration(&query.destination);
+            let direct_walk = departure_time + walk_time;
             best_times.insert(query.destination.clone(), direct_walk);
+            pq.push(SearchState {
+                current_location: query.destination.clone(),
+                current_time: direct_walk,
+                path: vec![Leg::Walk {
+                    from: query.origin.clone(),
+                    to: query.destination.clone(),
+                    distance_miles: dist_miles,
+                    departure_time,
+                    arrival_time: direct_walk,
+                }],
+            });
         }
 
         pq.push(SearchState {
@@ -696,6 +709,23 @@ impl<'a> SearchContext<'a> {
 }
 
 pub fn find_route(transit: &TransitNetwork, bike: &BikeNetwork, query: Query) -> Option<Plan> {
+    if query.origin == query.destination {
+        let departure_time = query.get_departure_time();
+        return Some(Plan {
+            origin: query.origin.clone(),
+            destination: query.destination.clone(),
+            departure_time,
+            arrival_time: departure_time,
+            legs: vec![Leg::Walk {
+                from: query.origin,
+                to: query.destination,
+                distance_miles: 0.0,
+                departure_time,
+                arrival_time: departure_time,
+            }],
+        });
+    }
+
     let mut ctx = SearchContext::new(transit, bike, &query);
 
     while let Some(state) = ctx.pq.pop() {
@@ -786,6 +816,36 @@ mod tests {
         assert_eq!(stats.bike_mins, 0);
         assert_eq!(stats.walk_miles, 0.5);
         assert_eq!(stats.bike_miles, 0.0);
+    }
+
+    #[test]
+    fn test_nearby_points_return_walk_route() {
+        let transit = TransitNetwork::new();
+        let bike = BikeNetwork::new();
+        let origin = Location::Point(Coordinates::new(40.72204291698643, -74.03684560930655));
+        let destination = Location::Point(Coordinates::new(40.72204775835277, -74.0368774356056));
+        let query = Query::new(origin, destination);
+        let plan = find_route(&transit, &bike, query);
+        assert!(plan.is_some(), "Expected a route plan for nearby coordinates");
+        let plan = plan.unwrap();
+        assert_eq!(plan.legs.len(), 1);
+        assert!(matches!(plan.legs[0], Leg::Walk { .. }));
+    }
+
+    #[test]
+    fn test_same_origin_and_destination() {
+        let transit = TransitNetwork::new();
+        let bike = BikeNetwork::new();
+        let origin = Location::Point(Coordinates::new(40.72204, -74.03684));
+        let query = Query::new(origin.clone(), origin);
+        let plan = find_route(&transit, &bike, query);
+        assert!(plan.is_some(), "Expected a route plan for identical origin and destination");
+        let plan = plan.unwrap();
+        assert_eq!(plan.legs.len(), 1);
+        match &plan.legs[0] {
+            Leg::Walk { distance_miles, .. } => assert_eq!(*distance_miles, 0.0),
+            _ => panic!("Expected walk leg"),
+        }
     }
 }
 
