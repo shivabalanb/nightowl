@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Copy entire source tree & data
 COPY . .
-RUN cargo build --release --bin server
+RUN cargo build --release --bin nightowl
 
 # Stage 2: Minimal runtime image
 FROM debian:bookworm-slim
@@ -16,10 +16,11 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy pre-compiled binary and static GTFS schedule data
-COPY --from=builder /app/target/release/server /app/server
+COPY --from=builder /app/target/release/nightowl /app/nightowl
+RUN ln -s /app/nightowl /app/server
 COPY data/ /app/data/
 
 ENV PORT=3000
 EXPOSE 3000
 
-CMD ["/app/server"]
+CMD ["/app/nightowl"]

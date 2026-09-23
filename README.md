@@ -112,7 +112,7 @@ Leg 9: [Walk to Destination (0.08 mi, 2 mins)]
 To start the local REST API and interactive web map:
 
 ```bash
-cargo run --bin server
+cargo run
 ```
 
 Open **`http://localhost:3000`** in your browser.
