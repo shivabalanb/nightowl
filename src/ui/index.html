@@ -320,38 +320,47 @@
       }).addTo(map).bindPopup('<b>Current Location</b>');
     }
 
-    function useCurrentLocation(targetField = 'origin', triggerRoute = false) {
-      const input = targetField === 'origin' ? document.getElementById('originInput') : document.getElementById('destInput');
-      input.value = 'Current Location';
-
-      if ('geolocation' in navigator) {
+    function requestLocation() {
+      return new Promise((resolve) => {
+        if (!('geolocation' in navigator)) {
+          resolve(null);
+          return;
+        }
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            userLocation = {
+            resolve({
               lat: pos.coords.latitude,
               lon: pos.coords.longitude
-            };
-            resolvedCoords[targetField] = {
-              text: 'Current Location',
-              lat: pos.coords.latitude,
-              lon: pos.coords.longitude
-            };
-            updateUserLocationMarker();
-            if (triggerRoute) fetchRoute();
+            });
           },
           (err) => {
             console.warn('Geolocation error:', err.message);
-            if (targetField === 'origin' && input.value === 'Current Location') {
-              input.value = 'Home';
-            }
-            if (triggerRoute) fetchRoute();
+            resolve(null);
           },
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
+      });
+    }
+
+    async function useCurrentLocation(targetField = 'origin', triggerRoute = false) {
+      const input = targetField === 'origin' ? document.getElementById('originInput') : document.getElementById('destInput');
+      input.value = 'Current Location';
+
+      const loc = await requestLocation();
+      if (loc) {
+        userLocation = loc;
+        resolvedCoords[targetField] = {
+          text: 'Current Location',
+          lat: loc.lat,
+          lon: loc.lon
+        };
+        updateUserLocationMarker();
       } else {
-        if (targetField === 'origin') input.value = 'Home';
-        if (triggerRoute) fetchRoute();
+        if (targetField === 'origin' && input.value === 'Current Location') {
+          input.value = 'Home';
+        }
       }
+      if (triggerRoute) fetchRoute();
     }
 
     // Format times into standard 12-hour Eastern civilian time with AM/PM (no military time)
@@ -594,33 +603,18 @@
       const isOrigCurrent = orig.toLowerCase() === 'current location' || orig.toLowerCase() === 'my location';
       const isDestCurrent = dest.toLowerCase() === 'current location' || dest.toLowerCase() === 'my location';
 
-      if ((isOrigCurrent || isDestCurrent) && !userLocation) {
-        if ('geolocation' in navigator) {
-          document.getElementById('itineraryContainer').innerHTML = `
-            <div class="text-center py-12 text-zinc-400 font-mono text-xs flex flex-col items-center gap-3">
-              <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              <span class="animate-pulse">Acquiring current GPS location...</span>
-            </div>
-          `;
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              userLocation = {
-                lat: pos.coords.latitude,
-                lon: pos.coords.longitude
-              };
-              updateUserLocationMarker();
-              fetchRoute();
-            },
-            (err) => {
-              console.warn('Geolocation unavailable/denied:', err.message);
-              if (isOrigCurrent) document.getElementById('originInput').value = 'Home';
-              if (isDestCurrent) document.getElementById('destInput').value = 'Vital LES';
-              fetchRoute();
-            },
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-          );
-          return;
-        } else {
+      if (isOrigCurrent || isDestCurrent) {
+        document.getElementById('itineraryContainer').innerHTML = `
+          <div class="text-center py-12 text-zinc-400 font-mono text-xs flex flex-col items-center gap-3">
+            <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <span class="animate-pulse">Acquiring current GPS location...</span>
+          </div>
+        `;
+        const freshLoc = await requestLocation();
+        if (freshLoc) {
+          userLocation = freshLoc;
+          updateUserLocationMarker();
+        } else if (!userLocation) {
           if (isOrigCurrent) {
             document.getElementById('originInput').value = 'Home';
             orig = 'Home';
